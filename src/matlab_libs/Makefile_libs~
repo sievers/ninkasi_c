@@ -1,0 +1,38 @@
+CC=gcc
+BINDIR= ./
+SRCDIR= ./
+LIBDIR= ./
+
+INCLUDES= -I../include/ -I../  -I/cita/d/raid-sievers/sievers/util/fftw-3.2/include/ -I /cita/d/raid-nolta/local/include/
+
+CFLAGS= -fPIC -O3 -std=c99 ${INCLUDES}
+
+COBJ=dirfile.o getdata.o iers_bulletin_a.o  astro.o
+LINK= -shared  -lc 
+VERSION= 1.0.1
+#gcc -shared -Wl,-soname,libmystuff.so.1 \
+#    -o libmystuff.so.1.0.1 a.o b.o -lc
+
+
+%.o:%.c
+	$(CC) $(CFLAGS)  -c $< -o $@
+	$(CC) $(CFLAGS)  -E $< -o ${<}.cpp
+
+all: libreadtod
+
+
+libreadtod: ${COBJ}
+	${CC} ${LINK} -Wl,-soname,${@}.so.1 ${COBJ} -o ${@}.so.${VERSION}	
+	rm -f ${@}.so
+	ln -s ${@}.so.${VERSION} ${@}.so
+
+
+distclean:
+	rm -f lib*.so*
+	rm -f *.o
+clean:
+	rm -f *.o 
+
+
+#jgunzip: jgunzip.o
+#        $(CC) $(FFLAGS) jgunzip.o -o $(BINDIR)$@ $(ZLIB) $(CLIBS) $(FLIBS)

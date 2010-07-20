@@ -1,0 +1,20 @@
+#!/bin/bash
+
+LOCAL=/cita/d/raid-nolta/local
+
+
+JEMALLOC=/cita/d/raid-sievers/sievers/util/jemalloc_linux
+FFTWLIB=/cita/d/raid-sievers/sievers/util/fftw-3.2/
+BLASLIB=/cita/d/raid-sievers/sievers/tpb/GotoBLAS
+
+CBLASDIR=/cita/d/raid-sievers/sievers/tpb/CBLAS
+CBLASLIB=${CBLASDIR}/lib
+CBLASINC=${CBLASDIR}/src
+
+#export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib64/lam:/usr/lib/lam
+
+IDIRS="-I../include -I${FFTWLIB}/include -I$LOCAL/include -I$CBLASINC"
+LDIRS="-L${FFTWLIB}/lib -L$LOCAL/lib -L$CBLASLIB -L$BLASLIB -L${JEMALLOC}"
+
+./configure CPPFLAGS="$IDIRS" LDFLAGS="$LDIRS"
+

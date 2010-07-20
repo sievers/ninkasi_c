@@ -1,0 +1,17 @@
+#!/bin/csh
+set DIR=/cita/d/raid-sievers/sievers/act/mapper/
+    
+	    
+../bin/ninkasi << EOF
+@tol 1e-8
+@maxiter 20
+
+@output ${DIR}/src/cmb_alldet.map 
+@data ${DIR}/real_data/cmb_test_alldet_  
+@temp cmb_alldet_  
+@precon
+@pixsize 0.5  
+@mean
+
+#finished
+EOF

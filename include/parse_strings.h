@@ -1,0 +1,39 @@
+
+int get_command_line_int(int argc, char *argv[], char *match, int *val, int *found_list);
+int get_command_line_float(int argc, char *argv[], char *match, float *val, int *found_list);
+int get_command_line_double(int argc, char *argv[], char *match, double *val, int *found_list);
+int get_command_line_long(int argc, char *argv[], char *match, long *val, int *found_list);
+int get_command_line_string(int argc, char *argv[], char *match, char *val, int *found_list);
+
+int exists_in_command_line(int argc, char *argv[], char *match, int *found_list);
+int where_in_command_line(int argc, char *argv[], char *match);
+int expand_tokens(char *string_out, char *string_in,char *to_replace, char **replacement_strings, int n_to_replace, int max_len);
+void cut_trailing_newline(char *string_in);
+//void free_argv(char **argv);
+void free_argv(int argc, char **argv);
+char **create_argv(char *line, int *narg, char *delim);
+char **create_argv_new(char *line_in, int *narg, char *delim_in);
+
+
+
+char *scvector(long nrl, long nrh);
+char **scmatrix_vector(long nrl, long nrh);
+int isnum(char c);
+
+int **ivector_vector(long nrl, long nrh);
+int exists_in_string(char *string_in, char *tag);
+int exists_in_string(char *string_in, char *tag);
+
+void lengthen_string(char **cur_string,int *len_in, int n_to_add);
+char *read_all_stdin(const char *fname);
+int char_set_from_argv(int argc, char **argv,char *tag, char *stoptag, int *found_list, char *destination, int len);
+int double_set_from_argv(int argc, char **argv,char *tag, char *stoptag, int *found_list, double *destination, int len);
+int int_set_from_argv(int argc, char **argv,char *tag, char *stoptag, int *found_list, int *destination, int len);
+char *find_argument(int argc, char **argv, char *to_find, int *found_list);
+int find_tok(int argc, char **argv, char *to_find) ;
+
+char *get_list_as_string(int argc, char **argv, char *tag, char *start_tag, char *stop_tag, int *found_list);
+char *whitespace_pad_char(char *str, char *delim);
+char **get_list_from_argv(int argc, char **argv, char *tag, int *nfound, int *found_list);
+int *get_int_list_from_argv(int argc, char **argv, char *tag, int *nfound, int *found_list);
+

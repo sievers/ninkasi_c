@@ -1,0 +1,35 @@
+
+@tol 1e-4
+@maxiter 100 
+#@input /cita/d/raid-nolta/act/data/season1/bullet/src/simple_cmb_map_seed_1.dat 
+@output ./buller_alldet.map  
+@data [
+/cita/d/raid-nolta/act/data/season1/bullet/1197254913.1197254962
+/cita/d/raid-nolta/act/data/season1/bullet/1197253693.1197253731
+/cita/d/raid-nolta/act/data/season1/bullet/1197254303.1197254351
+/cita/d/raid-nolta/act/data/season1/bullet/1197255523.1197255573
+/cita/d/raid-nolta/act/data/season1/bullet/1197256133.1197256204
+/cita/d/raid-nolta/act/data/season1/bullet/1197256743.1197256791
+/cita/d/raid-nolta/act/data/season1/bullet/1197257353.1197257401
+]
+    
+@rawmap bullet_raw.map
+    
+@temp bullet_alldet
+@pointing_offsets /cita/d/raid-sievers/sievers/act/ninkasi/from_ishmael/pointing_offset_mbac145.txt
+@deglitch
+
+@precon
+@pixsize 0.5
+
+
+#@no_noise
+#@blank
+@mean
+#@maxtod 2
+#@add_noise
+#@quit
+#finished 
+
+
+

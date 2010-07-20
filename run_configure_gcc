@@ -1,0 +1,32 @@
+#!/bin/bash
+
+LOCAL=/home/sievers/local/
+
+
+#JEMALLOC=/home/sievers/util/jemalloc_linux/
+#FFTWLIB=/home/sievers/util/fftw-3.1.2/gcc/
+
+#BLASLIB=/opt/intel/Compiler/11.0/081/mkl/lib/em64t/
+#INTEL=/opt/intel/Compiler/11.0/081/lib/intel64/
+
+
+#/cita/d/raid-sievers/sievers/tpb/GotoBLAS
+
+#CBLASDIR=/cita/d/raid-sievers/sievers/tpb/CBLAS
+#CBLASLIB=${CBLASDIR}/lib
+#CBLASINC=${CBLASDIR}/src
+
+#export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib64/lam:/usr/lib/lam
+
+#IDIRS="-I../include -I${FFTWLIB}/include -I$LOCAL/include -I$CBLASINC"
+IDIRS="-I../include -I${LOCAL}/include -D_SKIP_MKL"
+#LDIRS="-L${FFTWLIB}/lib -L${LOCAL}/lib -L$CBLASLIB -L$BLASLIB -L${JEMALLOC}"
+#LDIRS=" -L${LOCAL}/lib -L${BLASLIB} -L${INTEL}"
+LDIRS=" -L${LOCAL}/lib"
+
+#PREFIX=/cita/d/raid-sievers/sievers/act/ninkasi/
+PREFIX=/home/sievers/local/
+
+
+./configure CPPFLAGS="$IDIRS" LDFLAGS="$LDIRS" --prefix=${PREFIX}   --enable-actdata-double  --enable-static
+

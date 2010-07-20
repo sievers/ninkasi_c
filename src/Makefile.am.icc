@@ -1,0 +1,58 @@
+
+bin_PROGRAMS = ninkasi
+
+#ninkasi_SOURCES = astro.c \
+#	clapack.c \
+#	common_mode.c \
+#	dirfile.c \
+#	getdata.c \
+#	iers_bulletin_a.c \
+#	mbCuts.c \
+#	ninkasi.c \
+#	ninkasi_noise.c \
+#	ninkasi_tod.c \
+#	parse_strings.c \
+#	ps_stuff.c \
+#	ninkasi_pointing.c \
+#	ninkasi_mathutils.c 
+#
+#ninkasi_LDADD = -lm -lpthread \
+#	-lgoto -lcblas -llapack \
+#	-lfftw3 -lfftw3f \
+#	-lslalib \
+#	-lslim
+
+lib_LTLIBRARIES = libninkasi.la
+libninkasi_la_SOURCES = astro.c \
+	clapack.c \
+	common_mode.c \
+	dirfile.c \
+	getdata.c \
+	iers_bulletin_a.c \
+	mbCuts.c \
+	ninkasi.c \
+	ninkasi_noise.c \
+	ninkasi_tod.c \
+	parse_strings.c \
+	ps_stuff.c \
+	ninkasi_pointing.c \
+	ninkasi_projection.c \
+	ninkasi_mathutils.c 
+
+ninkasi_SOURCES = ninkasi_main.c
+ninkasi_LDADD = libninkasi.la \
+	-lm -lpthread \
+	-lfftw3_threads -lfftw3 -lfftw3f \
+	-lslalib \
+	-lslim  -lpthread
+#	-llapack -lcblas  -lptf77blas -latlas -lpthread -lgfortran \
+#	-lcblas -lmkl  \
+	-lslim -lguide -lpthread
+
+#ninkasi_LDADD = libninkasi.la \
+#	-lm -lpthread \
+#	-lgoto -lcblas -llapack \
+#	-lfftw3 -lfftw3f \
+#	-lslalib \
+#	-lslim
+

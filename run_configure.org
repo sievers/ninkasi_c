@@ -1,0 +1,24 @@
+#!/bin/bash
+
+LOCAL=/cita/d/raid-nolta/local
+
+
+JEMALLOC=/home/sievers/util/jemalloc_linux/
+FFTWLIB=/home/sievers/util/fftw-3.1.2/gcc/
+BLASLIB=/opt/intel/mkl/10.0.3.020/lib
+#/cita/d/raid-sievers/sievers/tpb/GotoBLAS
+
+CBLASDIR=/cita/d/raid-sievers/sievers/tpb/CBLAS
+CBLASLIB=${CBLASDIR}/lib
+CBLASINC=${CBLASDIR}/src
+
+#export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib64/lam:/usr/lib/lam
+
+IDIRS="-I../include -I${FFTWLIB}/include -I$LOCAL/include -I$CBLASINC"
+LDIRS="-L${FFTWLIB}/lib -L$LOCAL/lib -L$CBLASLIB -L$BLASLIB -L${JEMALLOC}"
+
+PREFIX=/cita/d/raid-sievers/sievers/act/ninkasi/
+
+
+./configure CPPFLAGS="$IDIRS" LDFLAGS="$LDIRS" --prefix=${PREFIX}   --enable-actdata-double  --enable-static
+

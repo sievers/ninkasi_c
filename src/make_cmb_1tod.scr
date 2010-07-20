@@ -1,0 +1,30 @@
+ -t 1e-8
+ -m 75 
+-o ${DIR}/src/cmb_alldet.map 
+  -d ${DIR}/real_data/cmb_test_alldet_  
+-T cmb_alldet_  
+ --precon  
+ --pixsize=0.5  
+ -M
+
+
+#Iteration took  279.090 seconds.
+#residual is    5.90199e+02 at iteration 1.
+#Iteration took  280.499 seconds.
+#residual is    4.04736e+01 at iteration 2.
+#Iteration took  279.482 seconds.
+#residual is    6.10053e+00 at iteration 3.
+#Iteration took  279.031 seconds.
+#residual is    2.72405e+00 at iteration 4.
+#Iteration took  278.897 seconds.
+#residual is    3.38232e+00 at iteration 5.
+#Iteration took  280.262 seconds.
+#residual is    7.56068e+00 at iteration 6.
+#Iteration took  280.600 seconds.
+#residual is    1.02430e+01 at iteration 7.
+#Iteration took  279.719 seconds.
+#residual is    5.37215e+00 at iteration 8.
+#Iteration took  280.100 seconds.
+#residual is    3.03332e+00 at iteration 9.
+#Iteration took  279.527 seconds.
+#residual is    1.29086e+00 at iteration 10.
