@@ -55,4 +55,10 @@ void scale_banded_noise_band( mbTOD *tod,int which_band,actData fac);
 actData *get_freq_vec(mbTOD *tod);
 bool do_I_have_rotations(mbTOD *tod);
 void add_noise_to_tod_gaussian(mbTOD *tod);
+
+
+void apply_noise_1det(mbTOD *tod, int det, actComplex *ts);
+void apply_noise_1det_powlaw(mbTOD *tod, int det, act_fftw_complex *ts );
+void apply_noise(mbTOD *tod);
+void set_noise_powlaw(mbTOD *tod, actData *amps, actData *knees, actData *pows);
 #endif
