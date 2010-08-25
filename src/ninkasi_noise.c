@@ -1726,3 +1726,81 @@ void apply_banded_noise_model(mbTOD *tod)
     }
   
 }
+
+/*--------------------------------------------------------------------------------*/
+void set_noise_powlaw(mbTOD *tod, actData *amps, actData *knees, actData *pows)
+{
+  if (!tod->noise) {
+    tod->noise=(  mbNoiseVectorStruct *)calloc(1,sizeof(mbNoiseVectorStruct));
+    tod->noise->ndet=tod->ndet;
+    tod->noise->noises=(  NoiseParams1Pix *)calloc(tod->ndet,sizeof(NoiseParams1Pix));
+  }
+  for (int i=0;i<tod->ndet;i++) {
+    tod->noise->noises[i].noise_type=MBNOISE_LINEAR_POWLAW;
+    tod->noise->noises[i].params[0]=amps[i];
+    tod->noise->noises[i].params[1]=knees[i];
+    tod->noise->noises[i].params[2]=pows[i];
+  }
+  
+}
+/*--------------------------------------------------------------------------------*/
+void apply_noise(mbTOD *tod)
+{
+  if (!tod->data) {
+    fprintf(stderr,"Warning - no data found when attempting to apply model in apply_noise.\n");
+    return;
+  }
+  if (tod->band_noise) {
+    apply_banded_noise_model(tod);
+    return;
+  }
+  if (tod->noise) {
+    actComplex **data_ft=fft_all_data(tod);
+
+#pragma omp parallel for shared(tod,data_ft) default(none)
+    for (int i=0;i<tod->ndet;i++) {
+      apply_noise_1det(tod,i,data_ft[i]);
+    }
+
+    ifft_all_data(tod,data_ft);
+    free(data_ft[0]);
+    free(data_ft);
+    return;    
+  }
+  printf("Skipping noise application since no noise model found.\n");  
+}
+/*--------------------------------------------------------------------------------*/
+void apply_noise_1det_powlaw(mbTOD *tod, int det, act_fftw_complex *ts )
+{  
+  //please do checks before you're here.
+  int nn=fft_real2complex_nelem(tod->ndata);
+
+  actData amp=tod->noise->noises[det].params[0];
+  actData knee_inv=1.0/tod->noise->noises[det].params[1];
+  actData ind=tod->noise->noises[det].params[2];
+  
+  if (amp==0) {  //set amp=0 to nuke detector
+    for (int i=0;i<nn;i++) 
+      tod->data[det][i]=0;
+    return;
+  }
+  ts[0]=0;
+  actData fac=1.0/((actData)tod->ndata)/tod->deltat;
+  
+  for (int i=1;i<nn;i++) {
+    actData tt=((actData)i)*fac;
+    ts[i]=ts[i]/(amp*(1+pow(tt*knee_inv,-ind)));
+  }
+  
+}
+/*--------------------------------------------------------------------------------*/
+void apply_noise_1det(mbTOD *tod, int det, actComplex *ts)
+{
+  switch(tod->noise->noises[det].noise_type) {
+  case MBNOISE_LINEAR_POWLAW:
+    apply_noise_1det_powlaw(tod,det,ts);
+    break;
+  default:
+    fprintf(stderr,"Warning - unsupported noise class in apply_noise_1det on detector %d\n",det);
+  }
+}

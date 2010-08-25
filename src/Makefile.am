@@ -1,1 +1,1 @@
-Makefile.am.gcc
+Makefile.am.gcc_goto

@@ -236,7 +236,7 @@ ninkasi_LDADD = libninkasi.la \
 	-lm -lpthread \
 	-lfftw3_threads -lfftw3 -lfftw3f \
 	-lslalib \
-	-lmkl -liomp5 \
+	-llapack -lgoto2 \
 	-lslim  -lpthread
 
 all: all-am

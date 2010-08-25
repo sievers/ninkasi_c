@@ -8,6 +8,30 @@
 
 #include "ninkasi.h"
 
+
+/*--------------------------------------------------------------------------------*/
+static inline actData sin5(actData x)
+{
+  
+  actData x2=x*x;
+  actData x4=x2*x2;
+  
+  return x*(0.999999995715839  -0.166666579699042*x2 + 0.00833305061731921*x4  -0.000198090463568892*x2*x4 + 2.6051662751399e-06*x4*x4);
+  
+}
+
+/*--------------------------------------------------------------------------------*/
+static inline actData sin4(actData x)
+{
+
+  actData x2=x*x;
+  actData x4=x2*x2;
+
+  return x*(0.999999241345692  -0.166656796188478*x2 + 0.00831322507990857*x4   -0.000185234483301391*x2*x4 );
+
+}
+
+
 /*--------------------------------------------------------------------------------*/
 
 void get_map_projection(const mbTOD *tod, const MAP *map, int det, int *ind, PointingFitScratch *scratch)
@@ -63,7 +87,7 @@ void get_map_projection_wchecks(const mbTOD *tod, const MAP *map, int det, int *
       double decfac=RAD2DEG/map->projection->pv/map->projection->decdelt;
       for (int i=0;i<tod->ndata;i++) {
 	int rapix=scratch->ra[i]*rafac+map->projection->rapix-1+0.5;
-	int decpix=sin(scratch->dec[i])*decfac+map->projection->decpix-1+0.5;
+	int decpix=sin5(scratch->dec[i])*decfac+map->projection->decpix-1+0.5;  //change!  13 Aug 2010, should be faster, good to 1e-3 arcsec
 	ind[i]=map->nx*decpix+rapix;
       }
       if (inbounds)
