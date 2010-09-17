@@ -10,7 +10,8 @@
 #else
 typedef enum {
   NK_RECT,
-  NK_CEA
+  NK_CEA,
+  NK_TAN
 } nkProjectionType;
 
 

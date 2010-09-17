@@ -1753,6 +1753,13 @@ void cut_tod_ends(mbTOD *tod,actData tcut)
   int nsamp=tcut/tod->deltat;
   mbCutsExtendGlobal(tod->cuts,0,nsamp);
   mbCutsExtendGlobal(tod->cuts,tod->ndata-nsamp,tod->ndata);
+  //tod->n_to_window=nsamp;
+  set_tod_window(tod,tcut);
+}
+/*--------------------------------------------------------------------------------*/
+void set_tod_window(mbTOD *tod,actData tcut)
+{
+  int nsamp=tcut/tod->deltat;
   tod->n_to_window=nsamp;
 }
 /*--------------------------------------------------------------------------------*/

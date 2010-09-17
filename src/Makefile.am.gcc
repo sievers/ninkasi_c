@@ -44,7 +44,7 @@ ninkasi_LDADD = libninkasi.la \
 	-lm -lpthread \
 	-lfftw3_threads -lfftw3 -lfftw3f \
 	-lslalib \
-	-lmkl -liomp5 \
+#	-lmkl -liomp5 \
 	-lslim  -lpthread
 #	-lcblas -lmkl  \
 #	-lslim -lguide -lpthread

@@ -150,6 +150,7 @@ void map2tod(const MAP *map, mbTOD *tod,const PARAMS *params);
 void clear_map(MAP *map);
 void clear_tod(mbTOD *tod);
 actData **matrix(long n,long m);
+int **imatrix(long n,long m);
 actComplex **cmatrix(long n,long m);
 float **smatrix(long n,long m);
 void free_matrix(actData **mat);

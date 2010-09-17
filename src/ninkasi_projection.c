@@ -7,7 +7,7 @@
 #include <assert.h>
 
 #include "ninkasi.h"
-
+#include "ninkasi_projection.h"
 
 /*--------------------------------------------------------------------------------*/
 static inline actData sin5(actData x)
@@ -80,6 +80,16 @@ void get_map_projection_wchecks(const mbTOD *tod, const MAP *map, int det, int *
     for (int i=0;i<tod->ndata;i++)
       ind[i]=(int)((scratch->dec[i]-map->decmin)/map->pixsize)+map->ny*(int)((scratch->ra[i]-map->ramin)/map->pixsize);    
     break;
+  case(NK_TAN): {
+    
+    actData x,y;
+    for (int i=0;i<tod->ndata;i++) {
+      radec2xy_tan(&x,&y,scratch->ra[i],scratch->dec[i],map->projection);
+      ind[i]=(int)(x+0.5)+map->nx*((int)(y+0.5));
+    }
+    break;
+  }
+    
   case (NK_CEA):
     {
       //printf("Doing CEA projection.\n");
@@ -88,6 +98,7 @@ void get_map_projection_wchecks(const mbTOD *tod, const MAP *map, int det, int *
       for (int i=0;i<tod->ndata;i++) {
 	int rapix=scratch->ra[i]*rafac+map->projection->rapix-1+0.5;
 	int decpix=sin5(scratch->dec[i])*decfac+map->projection->decpix-1+0.5;  //change!  13 Aug 2010, should be faster, good to 1e-3 arcsec
+	//int decpix=sin(scratch->dec[i])*decfac+map->projection->decpix-1+0.5;  //change!  13 Aug 2010, should be faster, good to 1e-3 arcsec
 	ind[i]=map->nx*decpix+rapix;
       }
       if (inbounds)
@@ -142,6 +153,27 @@ void pix2radec_cea(MAP *map, int rapix, int decpix, actData *ra, actData *dec)
   
 }
 /*--------------------------------------------------------------------------------*/
+void pix2radec_tan(MAP *map, int rapix, int decpix, actData *ra, actData *dec)
+{
+
+  printf("ra crap is %14.4e %14.4e %14.4e\n",rapix,map->projection->rapix,map->projection->radelt);
+
+  double xx=(rapix-map->projection->rapix)*map->projection->radelt;
+  double yy=(decpix-map->projection->decpix)*map->projection->decdelt;
+  
+  printf("xx and yy are %14.4e %14.4e\n",xx,yy);
+
+  double rho=sqrt(xx*xx+yy*yy);
+  double cc=atan(rho);
+
+  printf("rho and cc-1 are %14.4e %14.4e\n",rho,cc-1);
+
+  *dec=asin(cos(cc)*sin(map->projection->dec_cent)+yy*sin(cc)*cos(map->projection->dec_cent)/rho);
+  *ra=map->projection->ra_cent+atan(xx*sin(cc)/(rho*cos(map->projection->dec_cent)*cos(cc)-yy*sin(map->projection->dec_cent)*sin(cc)));
+    
+}
+/*--------------------------------------------------------------------------------*/
+
 int set_map_projection_cea_simple( MAP *map)
 {
   map->projection->proj_type=NK_CEA;
@@ -152,6 +184,111 @@ int set_map_projection_cea_simple( MAP *map)
   map->projection->decdelt=map->pixsize/cos0*RAD2DEG;
   map->projection->radelt= -map->projection->decdelt;
   map->projection->pv=cos0*cos0;
+  actData ra0=map->ramax*RAD2DEG/map->projection->radelt;
+  actData ra1=map->ramin*RAD2DEG/map->projection->radelt+1;  //+1 is in in case of equality
+  actData dec0=sin(map->decmin)*RAD2DEG/map->projection->pv/map->projection->decdelt;
+  actData dec1=sin(map->decmax)*RAD2DEG/map->projection->pv/map->projection->decdelt+1;  //+1 is in case of equality
+  map->projection->rapix=-ra0;
+  map->projection->decpix=-dec0;
+  map->nx=ra1-ra0;
+  map->ny=dec1-dec0;
+  free(map->map);
+  map->npix=map->nx*map->ny;
+  map->map=(actData *)malloc(sizeof(actData)*map->npix);
+
+  mprintf(stdout,"Offsets are %d %d\n",map->projection->rapix,map->projection->decpix);
+  mprintf(stdout,"Pixsizes are %14.6f %14.6f\n",map->projection->radelt,map->projection->decdelt);
+  mprintf(stdout,"ra/dec0/1 are %14.8f %14.8f %14.8f %14.8f\n",ra0,ra1,dec0,dec1);
+  mprintf(stdout,"pv is %14.6f\n",map->projection->pv);
+  mprintf(stdout,"map sizes are %d %d\n",map->nx, map->ny);
+
+  return 0;
+}
+
+
+/*--------------------------------------------------------------------------------*/
+void radec2xy_tan_raw(actData *x, actData *y, actData ra, actData dec, actData ra0, actData dec0)
+{
+
+  
+  actData cosc=sin(dec0)*sin(dec)+cos(dec0)*cos(dec)*cos(ra-ra0);
+  *x=cos(dec)*sin(ra-ra0)/cosc;
+  *y=(cos(dec0)*sin(dec)-sin(dec0)*cos(dec)*cos(ra-ra0))/cosc;
+
+}
+/*--------------------------------------------------------------------------------*/
+void radec2xy_tan(actData *x, actData *y,actData ra, actData dec, nkProjection *proj)
+{
+  //printf("hello!\n");
+  radec2xy_tan_raw(x,y,ra,dec,proj->ra_cent,proj->dec_cent);
+  //printf("in here, x and y are %14.4e %14.4e\n",*x,*y);
+  *x=proj->rapix+*x/proj->radelt;
+  *y=proj->decpix-*y/proj->radelt;
+}
+/*--------------------------------------------------------------------------------*/
+void set_map_projection_tan_predef(MAP *map, actData ra_cent, actData dec_cent, actData rapix, actData decpix, actData pixsize, int nra, int ndec)
+{
+  map->projection->proj_type=NK_TAN;
+  map->projection->pv=0;
+  map->projection->radelt=-pixsize;
+  map->projection->decdelt=pixsize;
+  map->projection->ra_cent=ra_cent;
+  map->projection->dec_cent=dec_cent;
+  map->projection->rapix=rapix;
+  map->projection->decpix=decpix;
+
+
+
+  printf("setting rapix/decpix to %14.4g %14.4g\n",map->projection->rapix,map->projection->decpix);
+  printf("setting rapix/decpix from %14.4g %14.4g\n",rapix,decpix);
+
+  map->nx=nra;
+  map->ny=ndec;
+  map->npix=nra*ndec;
+
+  pix2radec_cea(map,0,0,&(map->ramin),&(map->decmin));
+  pix2radec_cea(map,map->nx-1,map->ny-1,&(map->ramax),&(map->decmax));
+
+  
+  if (map->ramin>map->ramax) {
+    actData tmp=map->ramin;
+    map->ramin=map->ramax;
+    map->ramax=tmp;
+  }
+  
+  if (map->decmin>map->decmax) {
+    actData tmp=map->decmin;
+    map->decmin=map->decmax;
+    map->decmax=tmp;
+  }
+
+
+
+  free(map->map);
+  map->map=(actData *)malloc(sizeof(actData)*map->npix);
+
+  
+}
+/*--------------------------------------------------------------------------------*/
+int set_map_projection_tan_simple( MAP *map)
+{
+  map->projection->proj_type=NK_TAN;
+
+  double dec_cent=0.5*(map->decmax+map->decmin);
+  double ra_cent=0.5*(map->ramax+map->ramin);
+
+  actData x0,x1,y0,y1;
+  radec2xy_tan_raw(&x0,&y0,map->ramin,map->decmin,ra_cent,dec_cent);
+  radec2xy_tan_raw(&x1,&y1,map->ramax,map->decmax,ra_cent,dec_cent);
+  
+  printf("ra lims are %12.4e %12.4e, dec lims are %12.4e %12.4e\n",x0,x1,y0,y1);
+
+  return 0;
+
+  map->projection->decdelt=map->pixsize*RAD2DEG;
+  map->projection->radelt= -map->projection->decdelt;
+  map->projection->pv=1.0;
+
   actData ra0=map->ramax*RAD2DEG/map->projection->radelt;
   actData ra1=map->ramin*RAD2DEG/map->projection->radelt+1;  //+1 is in in case of equality
   actData dec0=sin(map->decmin)*RAD2DEG/map->projection->pv/map->projection->decdelt;
