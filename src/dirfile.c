@@ -67,6 +67,7 @@ dirfile_has_channel( const struct FormatType *F, const char *channel )
     return true;
 }
 
+
 void *
 dirfile_read_channel( char typechar, const struct FormatType *F,
         const char *channelname, int *nsamples_out )
@@ -108,6 +109,31 @@ dirfile_read_channel( char typechar, const struct FormatType *F,
 
     return data;
 }
+/*--------------------------------------------------------------------------------*/
+
+void *dirfile_read_channel_direct(char typechar, const char *filename, const char *channelname, int *nsamples_out)
+{
+  int status;
+  *nsamples_out=0;
+  struct FormatType *format = GetFormat( filename, NULL, &status );
+  if (format==NULL) {
+    fprintf(stderr,"Warning - problem reading format from file .%s.\n",filename);
+    return NULL;
+  }
+  void *data=dirfile_read_channel(typechar,format,channelname,nsamples_out);
+  if (data==NULL) {
+    fprintf(stderr,"Error reading channel %s from %s\n",channelname,filename);
+
+  }
+
+  GetDataClose(format);
+  free(format);
+  return data;
+
+}
+
+/*--------------------------------------------------------------------------------*/
+
 
 int32_t *
 dirfile_read_int32_channel( const struct FormatType *F,
@@ -171,6 +197,7 @@ write_tes_channelname( char *s, int row, int col )
 mbTOD *
 read_dirfile_tod_header( const char *filename )
 {
+  //printf("reading .%s.\n",filename);
     assert( filename != NULL );
 
     int status, n;
@@ -331,8 +358,9 @@ actData *decimate_vector_in_place(actData *vec, int *nn) //shrink a vector by a 
 mbTOD *
 read_dirfile_tod_header_decimate( const char *filename , int decimate )
 {
-  
+  //fprintf(stderr,"inside read_dirfile_tod_header_decimate.\n");
   mbTOD *tod=read_dirfile_tod_header(filename);
+
   if (decimate==0)
     return tod;
   

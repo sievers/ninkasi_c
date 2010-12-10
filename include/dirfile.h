@@ -3,6 +3,10 @@
 
 #include "mbTOD.h"
 
+
+void *dirfile_read_channel_direct(char typechar, const char *filename, const char *channelname, int *nsamples_out);
+
+
 void read_dirfile_tod_data (mbTOD *tod);
 actData **read_dirfile_tod_data_from_rowcol_list (mbTOD *tod, int *row, int *col, int ndet, actData **data);
 

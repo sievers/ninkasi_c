@@ -4,6 +4,7 @@
 #include "mbTOD.h"
 
 void read_dirfile_tod_data (mbTOD *tod);
+actData **read_dirfile_tod_data_from_rowcol_list (mbTOD *tod, int *row, int *col, int ndet, actData **data);
 
 mbTOD *
 read_dirfile_tod_header( const char *filename );

@@ -248,7 +248,7 @@ file_exists( const char *filename )
 size_t
 file_size( const char *filename )
 {
-  printf( "file_size: %s\n", filename );
+  //printf( "file_size: %s\n", filename );
     ZZIP_FILE *fp = zzip_fopen( filename, "r" );
     assert( fp != NULL ); 
     ZZIP_STAT stat;
