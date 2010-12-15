@@ -73,6 +73,7 @@ dirfile_read_channel( char typechar, const struct FormatType *F,
 {
     int status = 0;
 
+    /*
     int nframes = GetNFrames( F, &status, channelname );
     if ( status != GD_E_OK )
     {
@@ -80,6 +81,15 @@ dirfile_read_channel( char typechar, const struct FormatType *F,
         return NULL;
     }
     assert( nframes > 0 );
+    */
+
+    int nsamples = GetNSamples( F, &status, channelname );
+    if ( status != GD_E_OK )
+    {
+        dirfile_print_errstatus(status);
+        return NULL;
+    }
+    assert( nsamples > 0 );
 
     int samples_per_frame = GetSamplesPerFrame( F, channelname, &status );
     if ( status != GD_E_OK )
@@ -89,7 +99,7 @@ dirfile_read_channel( char typechar, const struct FormatType *F,
     }
     assert( samples_per_frame > 0 );
 
-    int nsamples = nframes * samples_per_frame;
+    //int nsamples = nframes * samples_per_frame;
     size_t nbytes = nsamples * bytes_per_sample(typechar);
 
     void *data = malloc( nbytes );

@@ -2074,6 +2074,45 @@ int GetNFrames(const struct FormatType *F, int *error_code, const char *in_field
 
 /***************************************************************************/
 /*                                                                         */
+/*    Get the number of samples available                                  */
+/*                                                                         */
+/***************************************************************************/
+int GetNSamples(const struct FormatType *F, int *error_code, const char *in_field) {
+  char raw_data_filename[2 * MAX_FILENAME_LENGTH + FIELD_LENGTH + 2];
+  //struct stat statbuf;
+  long st_size;
+  int nf;
+
+  *error_code = GD_E_OK;
+
+  if (!F || F->n_raw==0) {
+    *error_code = GD_E_FORMAT;
+    return(0);
+  }
+
+  /* load the first valid raw field, either as a regular or a slim file */
+  snprintf(raw_data_filename, 2 * MAX_FILENAME_LENGTH + FIELD_LENGTH + 2,
+      "%s/%s", F->FileDirName, F->first_field.file);
+  //if (stat(raw_data_filename, &statbuf) < 0) {
+  if ( !file_exists(raw_data_filename) ) {
+    snprintf(raw_data_filename, 2 * MAX_FILENAME_LENGTH + FIELD_LENGTH + 2,
+             "%s/%s.slm", F->FileDirName, F->first_field.file);
+    st_size = slimrawsize(raw_data_filename);
+    if (st_size < 0)
+      return(0);
+  } else
+  {
+    st_size = file_size( raw_data_filename );
+  }
+
+  nf = st_size/F->first_field.size
+     + F->frame_offset*F->first_field.samples_per_frame;
+
+  return(nf);
+}
+
+/***************************************************************************/
+/*                                                                         */
 /*    Get the number of samples for each frame for the given field         */
 /*                                                                         */
 /***************************************************************************/
