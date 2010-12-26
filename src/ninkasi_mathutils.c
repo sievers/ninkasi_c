@@ -3,10 +3,16 @@
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
+#include <assert.h>
 
 #include "ninkasi.h"
 #include "ninkasi_mathutils.h"
 #include "nk_clapack.h"
+
+//#define MPI_DEBUG
+#ifdef MPI_DEBUG
+#include <mpi.h>
+#endif
 
 void dgemm_(char *TRANSA, char *TRANSB, int *M, int *N, int *K, double *ALPHA, double *A, int *LDA, double *B, int *LDB, double  *beta, double *C, int *LDC, int transalen, int transblen );
 void sgemm_(char *TRANSA, char *TRANSB, int *M, int *N, int *K, float *ALPHA, float *A, int *LDA, float *B, int *LDB, float *beta, float *C, int *LDC, int transalen, int transblen );
@@ -104,7 +110,7 @@ actData compute_median_scat(int ndata, actData *data)
   actData *vec=vector(ndata);
   for (int i=0;i<ndata;i++) 
     vec[i]=fabs(vec[i]-median_val);
-  actData median_scat=compute_median(ndata,vec);
+  actData median_scat=compute_median_inplace(ndata,vec);
   free(vec);
   return median_scat;
 }
@@ -263,18 +269,58 @@ PolyParams2d *copy_2d_polyfit(PolyParams2d *fit)
 }
 
 /*--------------------------------------------------------------------------------*/
+actData vec_mean(actData *vec, int n)
+{
+  actData mv=0;
+  for (int i=0;i<n;i++)
+    mv+=vec[i];
+  mv /=(actData)n;
+  return mv;
+}
+/*--------------------------------------------------------------------------------*/
+actData vec_abs_err(actData *vec, int n)
+{
+  actData mv=vec_mean(vec,n);
+  actData scat=0;
+  for (int i=0;i<n;i++)
+    scat +=fabs(vec[i]-mv);
+
+  scat /=(actData)n;
+  return scat;
+}
+/*--------------------------------------------------------------------------------*/
 PolyParams2d *fit_2d_poly(actData *x, actData *y, actData *d, int n, actData *errs, int nx_param, int ny_param)
 //fit a 2d polynomial to data.  x and y are the 2-d positions, d is the data, n is the length
 // of x,y, and d.  nx_param and ny_param are the polynomial orders in x and y, respectively
 //errs is the errors.  If they come in null, they'll get ignored.
 {
 
-  PolyParams2d *fit=(PolyParams2d *)malloc(sizeof(PolyParams2d));
+  PolyParams2d *fit=(PolyParams2d *)malloc(sizeof(PolyParams2d));assert(fit);
   int np=nx_param*ny_param;
+#if 1  //new way, below seems to be causing problems.
+  fit->xcent=vec_mean(x,n);
+  fit->ycent=vec_mean(y,n);
+  fit->xwidth=vec_abs_err(x,n);
+  fit->ywidth=vec_abs_err(y,n);
+#else
   fit->xcent=compute_median_inplace(n,x);
   fit->ycent=compute_median_inplace(n,y);
   fit->xwidth=compute_median_scat(n,x);
   fit->ywidth=compute_median_scat(n,y);
+#endif
+
+
+#ifdef MPI_DEBUG
+  int myid;
+  MPI_Comm_rank(MPI_COMM_WORLD,&myid);
+  if (myid==0) {
+    printf("cents and scats are %14.8e %14.8g %14.8g %14.8g\n",fit->xcent,fit->xwidth,fit->ycent,fit->ywidth);
+    FILE *outfile=fopen("inside_stuff.txt","w");
+    for (int i=0;i<n;i++) 
+      fprintf(outfile,"%16.8e %16.8e %16.8e\n",x[i],y[i],d[i]);
+    fclose(outfile);
+  }
+#endif
 
   fit->nx=nx_param;
   fit->ny=ny_param;
@@ -291,8 +337,51 @@ PolyParams2d *fit_2d_poly(actData *x, actData *y, actData *d, int n, actData *er
       }
     }    
   }
-  
+#if 1
+  {
+    bool am_i_broken=false;
+    for (int i=0;i<n;i++) {
+      if (!isfinite(x[i]))
+	am_i_broken=true;
+    }
+    if (am_i_broken)
+    printf("broken in fit on x from not finite.\n");
+    
+    
+    am_i_broken=false;
+    for (int i=0;i<n;i++) {
+      if (!isfinite(y[i]))
+	am_i_broken=true;
+    }
+    if (am_i_broken)
+      printf("broken in fit on y from not finite.\n");
+  }
+#endif
+
   actData *params_1d=linfit(d,vecs,errs,n,np);
+
+
+#if 1
+  {
+    bool am_i_broken=false;
+    for (int i=0;i<n;i++) {
+      if (!isfinite(x[i]))
+	am_i_broken=true;
+    }
+    if (am_i_broken)
+    printf("broken in fit on x from not finite after.\n");
+    
+    
+    am_i_broken=false;
+    for (int i=0;i<n;i++) {
+      if (!isfinite(y[i]))
+	am_i_broken=true;
+    }
+    if (am_i_broken)
+      printf("broken in fit on y from not finite after.\n");
+  }
+#endif
+
   if (!params_1d) {
     fprintf(stderr,"Failure in fit_2d_poly.\n");    
     free(fit);

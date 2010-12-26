@@ -1624,6 +1624,52 @@ void get_simple_banded_noise_model(mbTOD *tod, bool *do_rots, mbNoiseType *types
   free(data_rot);
 }
 /*--------------------------------------------------------------------------------*/
+
+void get_simple_banded_noise_model_onerotmat(mbTOD *tod, bool *do_rots, mbNoiseType *types)
+{
+  assert(tod);
+  assert(tod->have_data);
+  assert(tod->band_noise);
+  mbNoiseVectorStructBands *noise=tod->band_noise;
+
+
+  actComplex **data_fft=fft_all_data(tod);
+  
+  //get total data covariance matrix.  Currently hardwired to skip first/last rows of data fft.
+  actData **corrmat=get_banded_correlation_matrix_from_fft_int(tod,data_fft,1,fft_real2complex_nelem(tod->ndata)-1);
+  get_eigenvectors(corrmat,tod->ndet);
+
+  for (int band=0;band<noise->nband;band++) {
+    noise->do_rotations[band]=do_rots[band];
+    if (do_rots[band]) {
+      //actData **corrmat=get_banded_correlation_matrix_from_fft_int(tod,data_fft,noise->ibands[band],noise->ibands[band+1]);
+      //get_eigenvectors(corrmat,tod->ndet);
+      noise->rot_mats[band]=corrmat;
+      noise->inv_rot_mats_transpose[band]=corrmat;
+    }
+  }
+  
+  actComplex **data_rot=apply_banded_rotations(tod, data_fft, true);
+  
+  free(data_fft[0]);
+  free(data_fft);
+  
+  //printf("fitting noise now.\n");
+  for (int band=0;band<noise->nband;band++) {
+#pragma omp parallel for shared(band,tod,noise,data_rot,types) default(none)
+    for (int i=0;i<tod->ndet;i++) {
+      noise->noise_params[band][i].noise_type=types[band];
+      noise->noise_params[band][i].i_low=noise->ibands[band];
+      noise->noise_params[band][i].i_high=noise->ibands[band+1];
+      fit_banded_noise_1det(&(noise->noise_params[band][i]),data_rot[i]);
+    }
+  }
+  
+  free(data_rot[0]);
+  free(data_rot);
+}
+/*--------------------------------------------------------------------------------*/
+
 void apply_banded_noise_1det_full(mbNoiseParams1PixBand *params,actComplex *dat)
 {
   int n=params->i_high-params->i_low;

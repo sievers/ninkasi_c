@@ -15,7 +15,9 @@ static inline actData sin5(actData x)
   
   actData x2=x*x;
   actData x4=x2*x2;
-  
+
+  //Think this one is better, but sticking with old for not-changingness sake
+  //return x*(0.999999976513754 -0.166666475934889*x2+ 0.00833289922282484*x4 -0.000198008653066048*x2*x4+ 2.59043003161813e-06*x4*x4); 
   return x*(0.999999995715839  -0.166666579699042*x2 + 0.00833305061731921*x4  -0.000198090463568892*x2*x4 + 2.6051662751399e-06*x4*x4);
   
 }
@@ -27,6 +29,8 @@ static inline actData sin4(actData x)
   actData x2=x*x;
   actData x4=x2*x2;
 
+  //Think this one is better, sticking w/ old for not-changingness sake.
+  //return x*(0.999996601050172  -0.16664823561673*x2  + 0.00830628614181227*x4     -0.000183627485767557*x2*x4);
   return x*(0.999999241345692  -0.166656796188478*x2 + 0.00831322507990857*x4   -0.000185234483301391*x2*x4 );
 
 }
@@ -188,8 +192,8 @@ int set_map_projection_cea_simple( MAP *map)
   actData ra1=map->ramin*RAD2DEG/map->projection->radelt+1;  //+1 is in in case of equality
   actData dec0=sin(map->decmin)*RAD2DEG/map->projection->pv/map->projection->decdelt;
   actData dec1=sin(map->decmax)*RAD2DEG/map->projection->pv/map->projection->decdelt+1;  //+1 is in case of equality
-  map->projection->rapix=-ra0;
-  map->projection->decpix=-dec0;
+  map->projection->rapix=-(int)ra0;
+  map->projection->decpix=-(int)dec0;
   map->nx=ra1-ra0;
   map->ny=dec1-dec0;
   free(map->map);
