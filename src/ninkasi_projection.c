@@ -226,6 +226,49 @@ void radec2xy_tan(actData *x, actData *y,actData ra, actData dec, nkProjection *
   *y=proj->decpix-*y/proj->radelt;
 }
 /*--------------------------------------------------------------------------------*/
+void set_map_projection_tan_explicit(MAP *map, actData rapix, actData decpix, actData radelt, actData decdelt, actData pv, actData ra_cent, actData dec_cent, int nra, int ndec)
+{
+  if (map==NULL) {
+    printf("appear to be missing map.\n");
+    return;
+  }
+  if (map->projection==NULL) {
+    printf("projection appears to be missing.\n");
+    return;
+  }
+  map->projection->proj_type=NK_TAN;
+  map->projection->pv=pv;
+  map->projection->radelt=radelt;
+  map->projection->decdelt=decdelt;
+  map->projection->ra_cent=ra_cent;
+  map->projection->dec_cent=dec_cent;
+  map->projection->rapix=rapix;
+  map->projection->decpix=decpix;
+  map->nx=nra;
+  map->ny=ndec;
+  map->npix=nra*ndec;
+  printf("doing minima.\n");
+  pix2radec_cea(map,0,0,&(map->ramin),&(map->decmin));
+  pix2radec_cea(map,map->nx-1,map->ny-1,&(map->ramax),&(map->decmax));
+  
+  if (map->ramin>map->ramax) {
+    actData tmp=map->ramin;
+    map->ramin=map->ramax;
+    map->ramax=tmp;
+  }
+  
+  if (map->decmin>map->decmax) {
+    actData tmp=map->decmin;
+    map->decmin=map->decmax;
+    map->decmax=tmp;
+  }
+
+  free(map->map);
+  map->map=(actData *)malloc(sizeof(actData)*map->npix);
+
+
+}
+/*--------------------------------------------------------------------------------*/
 void set_map_projection_tan_predef(MAP *map, actData ra_cent, actData dec_cent, actData rapix, actData decpix, actData pixsize, int nra, int ndec)
 {
   map->projection->proj_type=NK_TAN;
