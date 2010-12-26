@@ -10,6 +10,11 @@
 #include "ninkasi_pointing.h"
 #include "mbTOD.h"
 
+//#define MPI_DEBUG
+#ifdef MPI_DEBUG
+#include <mpi.h>
+#endif
+
 //#define OLD_POINTING_OFFSET
 
 #define BAD_POINTING 100
@@ -350,8 +355,36 @@ void assign_tod_ra_dec(mbTOD *tod)
   tod->pointing_fit->dec_fit=fit_2d_poly(altvec,azvec,dec,nsamp,NULL,4,5);
 #else
   //this is the default.
+#ifdef MPI_DEBUG
+  int myid;
+  MPI_Comm_rank(MPI_COMM_WORLD,&myid);
+  if (myid==0) {    
+    FILE *outfile=fopen("unbroken_stuff.txt","w");
+    fprintf(outfile,"%ld\n",(long)azvec);
+    for (int i=0;i<nsamp;i++)
+      fprintf(outfile,"%16.8e %16.8e %16.8e\n",altvec[i],azvec[i],dec[i]);
+    fclose(outfile);
+  }
+#endif
+
   tod->pointing_fit->ra_fit=fit_2d_poly(altvec,azvec,ra,nsamp,NULL,2,3);
   tod->pointing_fit->dec_fit=fit_2d_poly(altvec,azvec,dec,nsamp,NULL,2,3);
+
+
+  if (!tod->pointing_fit->ra_fit)
+    printf("failed ra_fit on %s\n",tod->dirfile);
+  if (!tod->pointing_fit->dec_fit) {
+    printf("failed dec_fit on %s\n",tod->dirfile);
+#ifdef MPI_DEBUG
+    if (myid==0) {      
+      FILE *outfile=fopen("broken_stuff.txt","w");
+      fprintf(outfile,"%ld\n",(long)azvec);      
+      for (int i=0;i<nsamp;i++)
+	fprintf(outfile,"%16.8e %16.8e %16.8e\n",altvec[i],azvec[i],dec[i]);
+      fclose(outfile);
+    }
+#endif
+  }
 #endif
   
   actData alt_median=compute_median_inplace(nsamp,altvec);
