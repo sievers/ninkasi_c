@@ -1009,8 +1009,9 @@ int read_tod_data(mbTOD *tod)
   if (tod->have_data==0)
     tod->data=matrix(tod->ndet,tod->ndata);
   tod->have_data=1;  
+  //printf("clearing tod.\n");
   clear_tod(tod);
-
+  //printf("reading tod.\n");
   read_dirfile_tod_data (tod);
   return 0;
 }
@@ -1505,6 +1506,7 @@ void map2det(const MAP *map, const mbTOD *tod, actData *vec, int *ind, int det, 
 {
   //get_pointing_vec(tod,map,det,ind);
   get_pointing_vec_new(tod,map,det,ind,scratch);
+  
   for (int j=0;j<tod->ndata;j++) {
     vec[j]+=map->map[ind[j]];
   }
@@ -1538,18 +1540,38 @@ long is_tod_inbounds(const MAP *map, mbTOD *tod,const PARAMS *params)
 }
 
 /*--------------------------------------------------------------------------------*/
+void save_tod_projection(const MAP *map, mbTOD *tod,const PARAMS *params)
+{
+  int **proj=imatrix(tod->ndet,tod->ndata);
+#pragma omp parallel shared(tod,map,proj) default(none) 
+  {
+    PointingFitScratch *scratch=allocate_pointing_fit_scratch(tod);
+    //int *ind=(int *)malloc_retry(sizeof(int)*tod->ndata);
+#pragma omp for schedule(dynamic,1)
+    for (int i=0;i<tod->ndet;i++) {
+      if (!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i])) {
+	get_pointing_vec_new(tod,map,i,proj[i],scratch);	
+      }
+      
+    }
+  }
+  tod->pixelization_saved=proj;
+}
+
+/*--------------------------------------------------------------------------------*/
 void map2tod(const MAP *map, mbTOD *tod,const PARAMS *params)
 {
   
   assert(tod->have_data);
 
-#pragma omp parallel shared(tod,map) default(none) 
+#pragma omp parallel shared(tod,map,stderr) default(none) 
  {
    PointingFitScratch *scratch=allocate_pointing_fit_scratch(tod);
    int *ind=(int *)malloc_retry(sizeof(int)*tod->ndata);
 
 #pragma omp for schedule(dynamic,1)
    for (int i=0;i<tod->ndet;i++) {
+     //fprintf(stderr,"i is %d on %d\n",i,omp_get_thread_num());
      if (!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i])) {
        map2det(map,tod,tod->data[i],ind,i, scratch);
      }
@@ -1595,6 +1617,58 @@ void add_mapset2tod(const MAPvec *maps, mbTOD *tod, const PARAMS *params, actDat
   }
 }
 
+/*--------------------------------------------------------------------------------*/
+void add_src2tod(mbTOD *tod, actData ra, actData dec, actData src_amp, const actData *beam, actData dtheta, int nbeam, int oversamp)
+//Add a source with amplitude src_amp at (ra,dec) into the timestreams in TOD
+//eventually, oversamp will evaluate the beam at many places per sample
+{
+  if (!tod->have_data) {
+    fprintf(stderr,"TOD mising data in add_src2tod.\n");
+    return;
+  }
+  if (oversamp>1) {
+    fprintf(stderr,"Error in add_src2tod - oversamp>1 not yet supported.\n");
+    return;
+  }
+
+#pragma omp parallel shared(tod,ra,dec,src_amp,beam,dtheta,nbeam,oversamp) default(none) 
+  {
+    actData maxdist=dtheta*(nbeam-1);
+    actData maxra=maxdist/cos(dec);
+    PointingFitScratch *scratch=allocate_pointing_fit_scratch(tod);
+    actData cosdec=cos(dec);
+#pragma omp for schedule(dynamic,1)
+    for (int det=0;det<tod->ndet;det++) {
+      if (!mbCutsIsAlwaysCut(tod->cuts,tod->rows[det],tod->cols[det])) {
+	get_radec_from_altaz_fit_1det_coarse(tod,det,scratch);
+	for (int i=0;i<tod->ndata;i++) {
+	  //first check to see if we're anywhere close
+	  actData ddec=(scratch->dec[i]-dec);
+	  if (fabs(ddec)<maxdist) {
+	    actData dra=scratch->ra[i]-ra;
+	    if (fabs(dra)<maxra) {
+	      //we're close, so use haversine formula, 
+	      actData ss=sin(0.5*ddec);
+	      ss=ss*ss;
+	      actData ss2=sin(0.5*(dra));
+	      actData cc=cos(scratch->dec[i])*cosdec*ss2*ss2;
+	      actData mydist=2*asin(sqrt(ss+cc));
+	      //now do a linear interpolation
+	      if (mydist<maxdist) {
+		int ibin=mydist/dtheta;
+		actData frac=mydist-ibin*dtheta;
+		tod->data[det][i]+=src_amp*(beam[ibin]*(1-frac)+beam[ibin+1]*frac);
+	      }
+	    }
+	  }
+	}
+	
+      }
+    }
+    destroy_pointing_fit_scratch(scratch);    
+  }
+  
+}
 /*--------------------------------------------------------------------------------*/
 void clear_tod(mbTOD *tod)
 {

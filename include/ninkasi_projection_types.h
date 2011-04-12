@@ -7,7 +7,9 @@
 typedef enum {
   NK_RECT,
   NK_CEA,
-  NK_TAN
+  NK_TAN,
+  NK_HEALPIX_RING,
+  NK_HEALPIX_NEST
 
 } nkProjectionType;
 
@@ -25,7 +27,7 @@ typedef struct {
   actData rapix; //maps to crpix1
   actData decpix; //maps to crpix2
   actData pv;  //maps to pv2_1
-
+  int nside;  //for use in healpix
   
 } nkProjection;
 

@@ -11,7 +11,9 @@
 typedef enum {
   NK_RECT,
   NK_CEA,
-  NK_TAN
+  NK_TAN,
+  NK_HEALPIX_RING,
+  NK_HEALPIX_NEST
 } nkProjectionType;
 
 
@@ -38,7 +40,7 @@ int set_map_projection_tan_simple( MAP *map);
 int set_map_projection_cea_simple_keeppix( MAP *map);
 void radec2pix_cea(MAP *map, actData ra, actData dec, int *rapix, int *decpix);
 void pix2radec_cea(MAP *map, int rapix, int decpix, actData *ra, actData *dec);
-int set_map_projection_cea_predef( MAP *map,actData radelt, actData decdelt, int rapix, actData decpix, actData pv, int nra, int ndec);
+int set_map_projection_cea_predef( MAP *map,actData radelt, actData decdelt, actData rapix, actData decpix, actData pv, int nra, int ndec);
 
 void pix2radec_tan(MAP *map, int rapix, int decpix, actData *ra, actData *dec);
 void set_map_projection_tan_predef(MAP *map, actData ra_cent, actData dec_cent, actData rapix, actData decpix, actData pixsize, int nra, int ndec);
@@ -46,6 +48,10 @@ void set_map_projection_tan_explicit(MAP *map, actData rapix, actData decpix, ac
 
 void radec2xy_tan_raw(actData *x, actData *y, actData ra, actData dec, actData ra0, actData dec0);
 void radec2xy_tan(actData *x, actData *y,actData ra, actData dec, nkProjection *proj);
+
+
+int set_map_projection_healpix_ring(MAP *map, int nside);
+int set_map_projection_healpix_nest(MAP *map, int nside);
 
 
 

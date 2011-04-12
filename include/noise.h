@@ -62,4 +62,8 @@ void apply_noise_1det(mbTOD *tod, int det, actComplex *ts);
 void apply_noise_1det_powlaw(mbTOD *tod, int det, act_fftw_complex *ts );
 void apply_noise(mbTOD *tod);
 void set_noise_powlaw(mbTOD *tod, actData *amps, actData *knees, actData *pows);
+
+void simple_test_diag_proj_noise_inv(actData **data_in, actData **data_out, actData *noise, actData **vecs, int ndata, int ndet, int nvecs);
+void apply_diag_proj_noise_inv_bands(actData **data_in, actData **data_out, actData *noise, actData **vecs, int ndata, int ndet, int nvecs, int imin, int imax);
+
 #endif

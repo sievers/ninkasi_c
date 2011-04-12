@@ -83,6 +83,22 @@ typedef struct {
 } mbNoiseParams1PixBand;
 
 
+/************************************************************************************************************/
+/*!
+ *  Structure to hold the parameters describing noise as combination of detector and correlated
+ *  noise in bands
+ */
+
+typedef struct {
+  int ndet;
+  int nband;
+  int *band_edges;
+  int *nvecs;
+  actData **noises;
+  actData ***vecs;
+  
+}  mbNoiseStructBandsVecs;
+
 
 /************************************************************************************************************/
 /*!

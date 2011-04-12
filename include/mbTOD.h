@@ -185,6 +185,7 @@ typedef struct {
   actData **time_constants;
   mbNoiseVectorStruct *noise;
   mbNoiseVectorStructBands *band_noise;
+  mbNoiseStructBandsVecs *band_vecs_noise;
 
 
   actData *noise_amp;
@@ -194,6 +195,7 @@ typedef struct {
   actData *ddec;  
   
   PointingFit *pointing_fit;  //pointing fit, turn alt/az into ra/dec
+  int **pixelization_saved;  //save a map pixelization in here.  Will break if there are multiple classes of maps with different pixelizations.
   actData **ra_saved;
   actData **dec_saved;
   actData **data_saved;

@@ -1,3 +1,4 @@
+
 #ifndef NINKASI_H
 #define NINKASI_H
 
@@ -191,6 +192,7 @@ void tod2mapset(MAPvec *maps, mbTOD *tod, PARAMS *params);
 void assign_tod_value(mbTOD *tod, actData val);
 void free_tod_storage(mbTOD *tod);
 void tod2map(MAP *map, mbTOD *tod, PARAMS *params);
+
 int read_tod_data(mbTOD *tod);
 MAP *make_map_copy(MAP *map);
 
@@ -216,7 +218,7 @@ void *malloc_retry(size_t n);
 actData how_far_am_i_from_radec_radians(actData ra, actData dec, mbTOD *tod);
 actData how_far_am_i_from_radec(actData rah,actData ram,actData ras,actData dd,actData dm,actData ds,mbTOD *tod);
 actData  *how_far_am_i_from_radec_radians_vec( actData *ra, actData *dec, int npt, mbTOD *tod);
-
+void add_src2tod(mbTOD *tod, actData ra, actData dec, actData src_amp, const actData *beam, actData dtheta, int nbeam, int oversamp);
 //from ninkasi_projection
 //void get_map_projection(const mbTOD *tod, const MAP *map, int det, int *ind, PointingFitScratch *scratch);
 

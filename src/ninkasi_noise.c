@@ -1515,7 +1515,7 @@ void scale_banded_noise_band( mbTOD *tod,int which_band,actData fac)
     switch(noise->noise_params[which_band][i].noise_type) {
     case MBNOISE_CONSTANT: 
     case MBNOISE_INTERP: 
-      noise->noise_params[which_band][i].noise_data[0]*fac;
+      noise->noise_params[which_band][i].noise_data[0]*=fac;  //fixed missing = sign, JLS, 15-mar-2011
       break;     
     case MBNOISE_FULL: {
       mbNoiseParams1PixBand *nn=&(noise->noise_params[which_band][i]);
@@ -1741,6 +1741,29 @@ void apply_banded_noise_complex(mbTOD *tod, actComplex **dat)
   }
 }
 /*--------------------------------------------------------------------------------*/
+
+void apply_banded_projvec_noise_model(mbTOD *tod)
+{
+  assert(tod);
+  assert(tod->band_vecs_noise);
+  mbNoiseStructBandsVecs *noise=tod->band_vecs_noise;
+  actComplex **data_ft=fft_all_data(tod);
+  int nn=get_nn(tod->ndata);
+  actComplex **data_filt=cmatrix(tod->ndet,nn);
+  //explicitly zero out constant modes.
+  for (int i=0;i<tod->ndet;i++)
+    data_filt[i][0]=0;
+  for (int i=0;i<noise->nband;i++) {
+    apply_diag_proj_noise_inv_bands((double **)data_ft, (double **)data_filt, noise->noises[i],noise->vecs[i],2*nn,tod->ndet,noise->nvecs[i],2*noise->band_edges[i],2*noise->band_edges[i+1]);
+  }
+  ifft_all_data(tod,data_filt);
+  free(data_filt[0]);
+  free(data_filt);
+  free(data_ft[0]);
+  free(data_ft);
+}
+/*--------------------------------------------------------------------------------*/
+
 void apply_banded_noise_model(mbTOD *tod)
 {
 
@@ -1796,6 +1819,10 @@ void apply_noise(mbTOD *tod)
     fprintf(stderr,"Warning - no data found when attempting to apply model in apply_noise.\n");
     return;
   }
+  if (tod->band_vecs_noise) {
+      apply_banded_projvec_noise_model(tod);
+      return;
+    }
   if (tod->band_noise) {
     apply_banded_noise_model(tod);
     return;
@@ -1849,4 +1876,109 @@ void apply_noise_1det(mbTOD *tod, int det, actComplex *ts)
   default:
     fprintf(stderr,"Warning - unsupported noise class in apply_noise_1det on detector %d\n",det);
   }
+}
+
+/*--------------------------------------------------------------------------------*/
+void simple_test_diag_proj_noise_inv(actData **data_in, actData **data_out, actData *noise, actData **vecs, int ndata, int ndet, int nvecs)
+{
+
+  double tstart=omp_get_wtime();
+
+  double *ninv=vector(ndet);
+  for (int i=0;i<ndet;i++)
+    ninv[i]=1.0/noise[i];
+#if 0
+#pragma omp parallel for shared(data_in,data_out,noise,ndata,ndet) default(none)
+  for (int i=0;i<ndet;i++) {
+    for (int j=0;j<ndata;j++)
+      data_out[i][j]=data_in[i][j]/noise[i];
+  }
+#endif
+  
+  actData **ninv_vecs=matrix(nvecs,ndet);
+#pragma omp parallel for shared(nvecs,ndata,ninv_vecs,vecs,ninv,ndet) default(none)
+  for (int i=0;i<nvecs;i++) {
+    for (int j=0;j<ndet;j++)
+      ninv_vecs[i][j]=vecs[i][j]*ninv[j];
+  }
+  actData **inside=matrix(nvecs,nvecs);
+
+
+  act_gemm('t','n',nvecs,nvecs,ndet,1.0,vecs[0],ndet,ninv_vecs[0],ndet,0.0,inside[0],nvecs);
+
+  for (int i=0;i<nvecs;i++)
+    inside[i][i]+=1.0;
+
+  assert(mbInvertPosdefMat(inside,nvecs)==0);
+
+
+  double **tmp=matrix(nvecs,ndata);
+  act_gemm('n','n',ndata,nvecs,ndet,1.0,data_in[0],ndata,ninv_vecs[0],ndet,0.0,tmp[0],ndata);
+
+  double **tmp2=matrix(nvecs,ndata);
+  act_gemm('n','n',ndata,nvecs,nvecs,1.0,tmp[0],ndata,inside[0],nvecs,0.0,tmp2[0],ndata);
+
+  act_gemm('n','t',ndata,ndet,nvecs,1.0,tmp2[0],ndata,ninv_vecs[0],ndet,0.0,data_out[0],ndata);
+
+  
+#pragma omp parallel for shared(ndata,ndet,ninv,data_out,data_in) default(none)
+  for (int i=0;i<ndet;i++)
+    for (int j=0;j<ndata;j++)
+      data_out[i][j]=data_in[i][j]*ninv[i]-data_out[i][j];
+
+  
+   
+  free(tmp[0]);
+  free(tmp);
+  free(tmp2[0]);
+  free(tmp2);
+  free(inside[0]);
+  free(inside);
+  free(ninv_vecs[0]);
+  free(ninv_vecs);
+  free(ninv);
+
+}
+
+/*--------------------------------------------------------------------------------*/
+void apply_diag_proj_noise_inv_bands(actData **data_in, actData **data_out, actData *ninv, actData **vecs, int ndata, int ndet, int nvecs, int imin, int imax)
+{
+  actData **ninv_vecs=matrix(nvecs,ndet);
+#pragma omp parallel for shared(nvecs,ninv_vecs,vecs,ninv,ndet) default(none)
+  for (int i=0;i<nvecs;i++) {
+    for (int j=0;j<ndet;j++)
+      ninv_vecs[i][j]=vecs[i][j]*ninv[j];
+  }
+  actData **inside=matrix(nvecs,nvecs);
+
+
+  act_gemm('t','n',nvecs,nvecs,ndet,1.0,vecs[0],ndet,ninv_vecs[0],ndet,0.0,inside[0],nvecs);
+  for (int i=0;i<nvecs;i++)
+    inside[i][i]+=1.0;
+
+  assert(mbInvertPosdefMat(inside,nvecs)==0);
+
+  double **tmp=matrix(nvecs,ndata);
+  act_gemm('n','n',(imax-imin),nvecs,ndet,1.0,data_in[0]+imin,ndata,ninv_vecs[0],ndet,0.0,tmp[0]+imin,ndata);
+  double **tmp2=matrix(nvecs,ndata);
+  act_gemm('n','n',(imax-imin),nvecs,nvecs,1.0,tmp[0]+imin,ndata,inside[0],nvecs,0.0,tmp2[0]+imin,ndata);
+
+
+  act_gemm('n','t',(imax-imin),ndet,nvecs,1.0,tmp2[0]+imin,ndata,ninv_vecs[0],ndet,0.0,data_out[0]+imin,ndata);
+  
+#pragma omp parallel for shared(ndata,ndet,ninv,data_out,data_in,imin,imax) default(none)
+  for (int i=0;i<ndet;i++)
+    for (int j=imin;j<imax;j++)
+      data_out[i][j]=data_in[i][j]*ninv[i]-data_out[i][j];
+
+   
+  free(tmp[0]);
+  free(tmp);
+  free(tmp2[0]);
+  free(tmp2);
+  free(inside[0]);
+  free(inside);
+  free(ninv_vecs[0]);
+  free(ninv_vecs);
+
 }

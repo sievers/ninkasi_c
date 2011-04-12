@@ -47,6 +47,7 @@ void get_eigenvectors(actData **mat, int n);
 void allocate_tod_noise_bands(mbTOD *tod,actData *bands, int nband);
 actComplex **apply_banded_rotations(mbTOD *tod, actComplex **mat_in, bool do_forward);
 void get_simple_banded_noise_model(mbTOD *tod, bool *do_rots, mbNoiseType *types);
+void get_simple_banded_noise_model_onerotmat(mbTOD *tod, bool *do_rots, mbNoiseType *types);
 int fit_banded_noise_1det_constant(mbNoiseParams1PixBand *params, actData *dat);
 int fit_banded_noise_1det( mbNoiseParams1PixBand *params, actComplex *dataft);
 void apply_banded_noise_model(mbTOD *tod);

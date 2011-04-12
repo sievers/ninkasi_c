@@ -6,6 +6,11 @@
 #include <math.h>
 #include <assert.h>
 
+#ifdef USE_HEALPIX
+#include "chealpix.h"
+#define PI_OVER_TWO 1.5707963267948966
+#endif
+
 #include "ninkasi.h"
 #include "ninkasi_projection.h"
 
@@ -76,7 +81,11 @@ void get_map_projection_wchecks(const mbTOD *tod, const MAP *map, int det, int *
 //if inbounds is non-null, check to see if any pixels are out of bounds.  If so, flag 'em.  The check is done once per detector, so
 //this should be as fast as a non-checking version for mainline production.
 {
-
+  //fprintf(stderr,"Working on detector %d\n",det);
+  if (tod->pixelization_saved) {
+    memcpy(ind,tod->pixelization_saved[det],sizeof(int)*tod->ndata);
+    return;
+  }
   get_radec_from_altaz_fit_1det_coarse(tod,det,scratch);
   switch(map->projection->proj_type) {
   case(NK_RECT): 
@@ -84,16 +93,49 @@ void get_map_projection_wchecks(const mbTOD *tod, const MAP *map, int det, int *
     for (int i=0;i<tod->ndata;i++)
       ind[i]=(int)((scratch->dec[i]-map->decmin)/map->pixsize)+map->ny*(int)((scratch->ra[i]-map->ramin)/map->pixsize);    
     break;
-  case(NK_TAN): {
     
-    actData x,y;
-    for (int i=0;i<tod->ndata;i++) {
-      radec2xy_tan(&x,&y,scratch->ra[i],scratch->dec[i],map->projection);
-      ind[i]=(int)(x+0.5)+map->nx*((int)(y+0.5));
+  case(NK_TAN):
+    {
+      actData x,y;
+      for (int i=0;i<tod->ndata;i++) {
+	radec2xy_tan(&x,&y,scratch->ra[i],scratch->dec[i],map->projection);
+	ind[i]=(int)(x+0.5)+map->nx*((int)(y+0.5));
+      }
     }
     break;
-  }
+#ifdef USE_HEALPIX
+  case(NK_HEALPIX_RING): 
+    {
+      //int iter=0;
+      for (int i=0;i<tod->ndata;i++) {
+	/*	
+	if (iter==100) {
+	  iter=0;
+	  fprintf(stderr,"i is %d\n",i);
+	}
+	if (i>331550)
+	  printf("getting pixel for %14.6f %14.6f\n",scratch->dec[i],scratch->ra[i]);
+	*/
+	ang2pix_ring(map->projection->nside,PI_OVER_TWO-scratch->dec[i],scratch->ra[i],&ind[i]);
+	/*
+	if (i>331550)
+	  printf("pixel is %d\n",ind[i]);
+	iter++;
+	*/
+      }
+    }
+    break;
     
+  case(NK_HEALPIX_NEST): 
+    for (int i=0;i<tod->ndata;i++) {
+      //printf("getting pixel for %14.6f %14.6f\n",scratch->dec[i],scratch->ra[i]);
+      ang2pix_nest(map->projection->nside,PI_OVER_TWO-scratch->dec[i],scratch->ra[i],&ind[i]);
+      //printf("pixel is %d\n",ind[i]);
+      
+    }
+    break;
+    
+#endif
   case (NK_CEA):
     {
       //printf("Doing CEA projection.\n");
@@ -390,9 +432,49 @@ int set_map_projection_cea_simple_keeppix( MAP *map)
   return 0;
 }
 
-
 /*--------------------------------------------------------------------------------*/
-int set_map_projection_cea_predef( MAP *map,actData radelt, actData decdelt, int rapix, actData decpix, actData pv, int nra, int ndec)
+
+#ifdef USE_HEALPIX
+int set_map_projection_healpix_ring(MAP *map, int nside) {
+  int i=1;
+  int npix=12*nside*nside;
+  map->projection->proj_type=NK_HEALPIX_RING;
+  map->projection->nside=nside;
+
+  map->nx=npix;
+  map->ny=1;
+  map->npix=npix;
+  map->map=(actData *)malloc(sizeof(actData)*map->npix);
+  
+
+  return 0;
+}
+/*--------------------------------------------------------------------------------*/
+ 
+int set_map_projection_healpix_nest(MAP *map, int nside) {
+  int i=1;
+  int npix=12*nside*nside;
+  map->projection->proj_type=NK_HEALPIX_NEST;
+  map->projection->nside=nside;
+  map->nx=npix;
+  map->ny=1;
+  map->npix=npix;
+  map->map=(actData *)malloc(sizeof(actData)*map->npix);
+  //make an unthreaded call to ang2pix_nest as there are statics to be set up
+  long idum;
+  double theta=0.5;
+  double phi=0.5;
+
+  ang2pix_nest(nside,theta,phi,&idum);
+  pix2ang_nest(nside,idum,&theta,&phi);
+
+ 
+
+  return 0;
+}
+#endif  //use_healpix
+/*--------------------------------------------------------------------------------*/
+int set_map_projection_cea_predef( MAP *map,actData radelt, actData decdelt, actData rapix, actData decpix, actData pv, int nra, int ndec)
 {
   map->projection->proj_type=NK_CEA;
   

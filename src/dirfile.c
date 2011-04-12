@@ -211,6 +211,7 @@ read_dirfile_tod_header( const char *filename )
     assert( filename != NULL );
 
     int status, n;
+    //printf("reading format from %s\n",filename);
     struct FormatType *format = GetFormat( filename, NULL, &status );
     assert( format != NULL );
 
@@ -402,7 +403,9 @@ actData **read_dirfile_tod_data_from_rowcol_list (mbTOD *tod, int *row, int *col
   
   int status;
   assert(tod!=NULL);
+  //printf("reading format from %s.\n",tod->dirfile);
   struct FormatType *format = GetFormat( tod->dirfile, NULL, &status );
+  //printf("got it.\n");
   assert( format != NULL );
   
 
@@ -421,10 +424,13 @@ actData **read_dirfile_tod_data_from_rowcol_list (mbTOD *tod, int *row, int *col
     sprintf(tesfield,"tesdatar%02dc%02d",row[idet],col[idet]);
     int n;
 #ifndef ACTDATA_DOUBLE
+    //printf("reading float channel\n");
     actData *chan = dirfile_read_float_channel( format, tesfield, &n );
 #else
+    //printf("reading double channel\n");
     actData *chan = dirfile_read_double_channel( format, tesfield, &n );
 #endif
+    //printf("finished channel.\n");
     for (int ii=0;ii<tod->decimate;ii++)
       chan=decimate_vector(chan,&n);
     assert(n==tod->ndata);

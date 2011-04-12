@@ -185,6 +185,7 @@ typedef struct {
   actData **time_constants;
   mbNoiseVectorStruct *noise;
   mbNoiseVectorStructBands *band_noise;
+  mbNoiseStructBandsVecs *band_vecs_noise;
 
 
   actData *noise_amp;
@@ -196,6 +197,7 @@ typedef struct {
   PointingFit *pointing_fit;  //pointing fit, turn alt/az into ra/dec
   actData **ra_saved;
   actData **dec_saved;
+  actData **data_saved;
   BadTimestreams *bad_timestreams;
 
   bool have_plans;

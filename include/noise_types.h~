@@ -9,6 +9,7 @@
 typedef enum {  MBNOISE_UNDEFINED,     ///< Unknown noise model
                 MBNOISE_LINEAR_POWLAW,  ///< model as linear combination of power laws 
 		MBNOISE_CONSTANT,      ///  Noise is a constant
+		MBNOISE_INTERP,        ///  Noise is fit as in constant, but linearly interpolated when applied
 		MBNOISE_FULL           ///  Save a whole timestream
 		
 
