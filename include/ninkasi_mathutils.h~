@@ -48,4 +48,6 @@ void destroy_2d_poly(PolyParams2d *fit);
 actData mygasdev(unsigned *seed);
 actData myrand(unsigned *seed);
 
+void act_gemm(char transa, char transb, int m, int n, int k, actData alpha, actData *a, int lda, actData *b, int ldb, actData beta, actData *c, int ldc);
+
 #endif

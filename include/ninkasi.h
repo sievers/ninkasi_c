@@ -219,6 +219,7 @@ actData how_far_am_i_from_radec_radians(actData ra, actData dec, mbTOD *tod);
 actData how_far_am_i_from_radec(actData rah,actData ram,actData ras,actData dd,actData dm,actData ds,mbTOD *tod);
 actData  *how_far_am_i_from_radec_radians_vec( actData *ra, actData *dec, int npt, mbTOD *tod);
 void add_src2tod(mbTOD *tod, actData ra, actData dec, actData src_amp, const actData *beam, actData dtheta, int nbeam, int oversamp);
+void add_srcvec2tod(mbTOD *tod, actData *ra, actData *dec, actData *src_amp, int nsrc,const actData *beam, actData dtheta, int nbeam, int oversamp);
 //from ninkasi_projection
 //void get_map_projection(const mbTOD *tod, const MAP *map, int det, int *ind, PointingFitScratch *scratch);
 

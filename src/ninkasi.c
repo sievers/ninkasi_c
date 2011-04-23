@@ -32,6 +32,7 @@
 #include "noise.h"
 #include "ninkasi_pointing.h"
 #include "nk_clapack.h"
+#include "ninkasi_mathutils.h"
 
 #define ALTAZ_PER_LINE 3
 /*--------------------------------------------------------------------------------*/
@@ -1618,6 +1619,31 @@ void add_mapset2tod(const MAPvec *maps, mbTOD *tod, const PARAMS *params, actDat
 }
 
 /*--------------------------------------------------------------------------------*/
+actData inline calc_srcamp(actData ra, actData dec, actData srcra, actData srcdec, const actData *beam, actData dtheta, int nbeam, actData cosdec)
+{
+  actData maxdist=dtheta*(nbeam-1);
+  actData ddec=srcdec-dec;
+  if (fabs(ddec)<maxdist) {
+    actData dra=srcra-ra;
+    if (fabs(dra)*cosdec<maxdist) {
+      actData ss=sin5(0.5*ddec);
+      ss=ss*ss;
+      actData ss2=sin5(0.5*(dra));
+      actData cc=cos5(dec)*cosdec*ss2*ss2;
+      actData x=sqrt(ss+cc);
+      //actData mydist=2*asin(sqrt(ss+cc));
+      actData mydist=2*(x+x*x*x/6);
+      //now do a linear interpolation                                                                                                             
+      if (mydist<maxdist) {
+	int ibin=mydist/dtheta;
+	actData frac=mydist-ibin*dtheta;
+	return (beam[ibin]*(1-frac)+beam[ibin+1]*frac);
+      }
+    }
+  }
+  return 0;
+}
+/*--------------------------------------------------------------------------------*/
 void add_src2tod(mbTOD *tod, actData ra, actData dec, actData src_amp, const actData *beam, actData dtheta, int nbeam, int oversamp)
 //Add a source with amplitude src_amp at (ra,dec) into the timestreams in TOD
 //eventually, oversamp will evaluate the beam at many places per sample
@@ -1626,47 +1652,150 @@ void add_src2tod(mbTOD *tod, actData ra, actData dec, actData src_amp, const act
     fprintf(stderr,"TOD mising data in add_src2tod.\n");
     return;
   }
-  if (oversamp>1) {
-    fprintf(stderr,"Error in add_src2tod - oversamp>1 not yet supported.\n");
-    return;
-  }
+  
+  actData tpos=0,tdist=0;
 
-#pragma omp parallel shared(tod,ra,dec,src_amp,beam,dtheta,nbeam,oversamp) default(none) 
+#pragma omp parallel shared(tod,ra,dec,src_amp,beam,dtheta,nbeam,oversamp) reduction(+:tpos,tdist) default(none) 
   {
     actData maxdist=dtheta*(nbeam-1);
     actData maxra=maxdist/cos(dec);
     PointingFitScratch *scratch=allocate_pointing_fit_scratch(tod);
+    actData tt;
     actData cosdec=cos(dec);
 #pragma omp for schedule(dynamic,1)
     for (int det=0;det<tod->ndet;det++) {
       if (!mbCutsIsAlwaysCut(tod->cuts,tod->rows[det],tod->cols[det])) {
+	tt=omp_get_wtime();
 	get_radec_from_altaz_fit_1det_coarse(tod,det,scratch);
+	tpos+=omp_get_wtime()-tt;
+	
+	tt=omp_get_wtime();
 	for (int i=0;i<tod->ndata;i++) {
-	  //first check to see if we're anywhere close
-	  actData ddec=(scratch->dec[i]-dec);
-	  if (fabs(ddec)<maxdist) {
-	    actData dra=scratch->ra[i]-ra;
-	    if (fabs(dra)<maxra) {
-	      //we're close, so use haversine formula, 
-	      actData ss=sin(0.5*ddec);
-	      ss=ss*ss;
-	      actData ss2=sin(0.5*(dra));
-	      actData cc=cos(scratch->dec[i])*cosdec*ss2*ss2;
-	      actData mydist=2*asin(sqrt(ss+cc));
-	      //now do a linear interpolation
-	      if (mydist<maxdist) {
-		int ibin=mydist/dtheta;
-		actData frac=mydist-ibin*dtheta;
-		tod->data[det][i]+=src_amp*(beam[ibin]*(1-frac)+beam[ibin+1]*frac);
-	      }
+	  actData fac=0;
+	  if ((i==0)||(i==tod->ndata-1)||(oversamp<=1))
+	    tod->data[det][i]+=src_amp*calc_srcamp(scratch->ra[i],scratch->dec[i],ra,dec,beam,dtheta,nbeam,cosdec);
+	  else {
+	    actData fac=0;	    
+	    actData ra1=0.5*(scratch->ra[i]+scratch->ra[i-1]);
+	    actData dec1=0.5*(scratch->dec[i]+scratch->dec[i-1]);
+	    actData ra2=0.5*(scratch->ra[i]+scratch->ra[i+1]);
+	    actData dec2=0.5*(scratch->dec[i]+scratch->dec[i+1]);
+	    actData dra=(ra2-ra1)/(oversamp-1);
+	    actData ddec=(dec2-dec1)/(oversamp-1);
+	    
+	    for (int j=0;j<oversamp;j++) {
+	      fac+=calc_srcamp(ra1+dra*j,dec1+ddec*j,ra,dec,beam,dtheta,nbeam,cosdec);	      
 	    }
+	    tod->data[det][i]+=src_amp*fac/oversamp;
 	  }
 	}
+	tdist+=omp_get_wtime()-tt;
 	
       }
     }
     destroy_pointing_fit_scratch(scratch);    
   }
+  printf("distance and position times were %8.4f %8.4f\n",tpos,tdist);
+  
+}
+/*--------------------------------------------------------------------------------*/
+int tod_hits_source(actData ra, actData dec, actData dist, mbTOD *tod)
+{
+  actData cosdec=cos(0.5*(tod->decmin+tod->decmax));
+  if (tod->ramin>ra+dist/cosdec)
+    return 0;
+  if (tod->ramax<ra-dist/cosdec)
+    return 0;
+  if (tod->decmin>dec+dist)
+    return 0;
+  if (tod->decmax<dec-dist)
+    return 0;
+  return 1;
+
+}
+/*--------------------------------------------------------------------------------*/
+void add_srcvec2tod(mbTOD *tod, actData *ra_in, actData *dec_in, actData *src_amp_in, int nsrc_in,const actData *beam, actData dtheta, int nbeam, int oversamp)
+//Add a source with amplitude src_amp at (ra,dec) into the timestreams in TOD
+//eventually, oversamp will evaluate the beam at many places per sample
+{
+  if (!tod->have_data) {
+    fprintf(stderr,"TOD mising data in add_src2tod.\n");
+    return;
+  }
+  
+  actData *ra=vector(nsrc_in);
+  actData *dec=vector(nsrc_in);
+  actData *src_amp=vector(nsrc_in);
+
+  int nsrc=0;
+  
+  for (int i=0;i<nsrc_in;i++) 
+    if (tod_hits_source(ra_in[i],dec_in[i],nbeam*dtheta,tod)) {
+      ra[nsrc]=ra_in[i];
+      dec[nsrc]=dec_in[i];
+      src_amp[nsrc]=src_amp_in[i];
+      nsrc++;
+    }
+  
+  actData tpos=0,tdist=0;
+  
+  if (nsrc>0)     
+#pragma omp parallel shared(tod,ra,dec,src_amp,beam,dtheta,nbeam,oversamp,nsrc) reduction(+:tpos,tdist) default(none) 
+    {
+      actData tt;
+
+      actData maxdist=dtheta*(nbeam-1);
+      actData maxra=maxdist/cos(0.5*(tod->decmin+tod->decmax));
+      PointingFitScratch *scratch=allocate_pointing_fit_scratch(tod);
+      actData *cosdec=vector(nsrc);
+      for (int i=0;i<nsrc;i++)
+	cosdec[i]=cos(dec[i]);
+#pragma omp for schedule(dynamic,1)
+      for (int det=0;det<tod->ndet;det++) {
+	if (!mbCutsIsAlwaysCut(tod->cuts,tod->rows[det],tod->cols[det])) {
+	  tt=omp_get_wtime();
+	  get_radec_from_altaz_fit_1det_coarse(tod,det,scratch);
+	  tpos+=omp_get_wtime()-tt;
+
+
+	  tt=omp_get_wtime();
+
+	  for (int src=0;src<nsrc;src++)
+	    if (oversamp<=1) {
+	      for (int i=0;i<tod->ndata;i++)
+		tod->data[det][i]+=src_amp[src]*calc_srcamp(scratch->ra[i],scratch->dec[i],ra[src],dec[src],beam,dtheta,nbeam,cosdec[src]);
+	    }
+	    else  {
+	      tod->data[det][0]+=src_amp[src]*calc_srcamp(scratch->ra[0],scratch->dec[0],ra[src],dec[src],beam,dtheta,nbeam,cosdec[src]);
+	      for (int i=1;i<tod->ndata-1;i++) {
+		actData fac=0;	    
+		actData ra1=0.5*(scratch->ra[i]+scratch->ra[i-1]);
+		actData dec1=0.5*(scratch->dec[i]+scratch->dec[i-1]);
+		actData ra2=0.5*(scratch->ra[i]+scratch->ra[i+1]);
+		actData dec2=0.5*(scratch->dec[i]+scratch->dec[i+1]);
+		actData dra=(ra2-ra1)/(oversamp-1);
+		actData ddec=(dec2-dec1)/(oversamp-1);
+		for (int j=0;j<oversamp;j++) {
+		  fac+=calc_srcamp(ra1+dra*j,dec1+ddec*j,ra[src],dec[src],beam,dtheta,nbeam,cosdec[src]); 
+		}
+		tod->data[det][i]+=src_amp[src]*fac/oversamp;
+				
+	      }
+	      tod->data[det][tod->ndata-1]+=src_amp[src]*calc_srcamp(scratch->ra[tod->ndata-1],scratch->dec[tod->ndata-1],ra[src],dec[src],beam,dtheta,nbeam,cosdec[src]);
+	      	      
+	    }
+	  tdist+=omp_get_wtime()-tt;
+
+	}
+      }
+      free(cosdec);
+      destroy_pointing_fit_scratch(scratch);    
+    }
+  printf("distance and position times were %8.4f %8.4f\n",tpos,tdist);
+
+  free(ra);
+  free(dec);
+  free(src_amp);
   
 }
 /*--------------------------------------------------------------------------------*/
