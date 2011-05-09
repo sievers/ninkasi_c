@@ -158,6 +158,7 @@ typedef struct {
   double lon;          //!< longitude of observations
   mbCuts *cuts; //!< cuts that apply to this TOD
   mbUncut ***uncuts;  //!< uncut regions
+  mbUncut ***cuts_as_uncuts;  //!< uncut regions
   mbUncut ***kept_data; //have a second copy of uncuts in case we wish to project/gapfill different data
   actData **ends;        //!< values at beginning and end of TOD for detrend/retrend
   int *detrended;      //!< is 0 if detector was not detrended and 1 if detrended

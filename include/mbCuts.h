@@ -102,6 +102,7 @@ mbCutList *mbGetCutList( mbCuts *cuts, int row, int col );
 
 mbUncut *
 mbCutsGetUncut( const mbCuts *cuts, int row, int col, int min, int max );
+mbUncut *mbCutsInvertUncut(mbUncut *uncut, int ndata);
 int    mbUncutGetNumberOfRegions( mbUncut *uncut );
 void   mbUncutGetRegionLimits( mbUncut *uncut, int i, int *min, int *max );
 

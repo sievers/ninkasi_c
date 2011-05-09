@@ -71,7 +71,7 @@ mbCuts *mbCutsAllocFromFile( const char *filename );
 mbCuts *mbCutsAllocFromCuts( const mbCuts **cutsList, int ncuts );
 
 
-static void CutsFree(mbCuts *cuts);
+void CutsFree(mbCuts *cuts);
 
 
 

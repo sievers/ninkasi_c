@@ -453,8 +453,37 @@ mbUncutFree( mbUncut *uncut )
     psFree( uncut->indexLast );
 }
 
-///Get an mbUncut object for a detector
+///Invert (i.e. get cuts from uncuts) an mbUncut object for a detector
+mbUncut *mbCutsInvertUncut(mbUncut *uncut, int ndata)
+{
+  if (uncut==NULL)
+    return NULL;  //don't know what to do with empty uncuts
+  
 
+  mbUncut *cut = psAlloc( sizeof(mbUncut) );
+  cut->indexFirst=(int *)malloc(sizeof(int)*(uncut->nregions+2));
+  cut->indexLast=(int *)malloc(sizeof(int)*(uncut->nregions+2));
+  cut->nregions=0;
+  if (uncut->indexFirst >0) {
+    cut->indexFirst[cut->nregions]=0;
+    cut->indexLast[cut->nregions]=uncut->indexFirst[0]-1;
+    cut->nregions++;
+  }
+  for (int i=0;i<uncut->nregions-1;i++) {
+    cut->indexFirst[cut->nregions]=uncut->indexLast[i]+1;
+    cut->indexLast[cut->nregions]=uncut->indexFirst[i+1]-1;
+    cut->nregions++;    
+  }
+  if (uncut->indexLast[uncut->nregions-1]<ndata-1) {
+    cut->indexFirst[cut->nregions]=uncut->indexLast[uncut->nregions-1]+1;
+    cut->indexLast[cut->nregions]=ndata-1;
+    cut->nregions++;
+  }
+  return cut;
+  
+}
+
+///Get an mbUncut object for a detector
 mbUncut *
 mbCutsGetUncut( 
         const mbCuts *cuts, ///< mbCuts from which to draw the mbUncut
@@ -523,8 +552,6 @@ mbCutsGetUncut(
     psFree(list);
     return uncut;
 }
-
-
 
 
 /// Return whether a single detector is cut for none of the TOD.

@@ -502,6 +502,25 @@ void purge_cut_detectors(mbTOD *tod)
   tod->ndet=ngood;
 
 }
+
+/*--------------------------------------------------------------------------------*/
+mbUncut ***get_cut_regions(mbTOD *tod) 
+//calculate the cut regions a la uncut regions and return a matrix to 'em.
+//preferred form for gap-filling
+{
+  assert(tod);
+  assert(tod->uncuts);
+  
+  mbUncut **vec=(mbUncut **)malloc_retry(sizeof(mbUncut *)*tod->nrow*tod->ncol);
+  mbUncut ***mat=(mbUncut ***)malloc_retry(sizeof(mbUncut **)*tod->nrow);
+  for (int i=0;i<tod->nrow;i++)
+    mat[i]=vec+i*tod->ncol;
+
+  for (int i=0;i<tod->nrow;i++)
+    for (int j=0;j<tod->ncol;j++)
+      mat[i][j]=mbCutsInvertUncut(tod->uncuts[i][j],tod->ndata-1);
+  return mat;
+}
 /*--------------------------------------------------------------------------------*/
 mbUncut ***get_uncut_regions(mbTOD *tod) 
 //calculate the uncut regions and return a matrix to 'em.
@@ -521,6 +540,15 @@ mbUncut ***get_uncut_regions(mbTOD *tod)
   //decimate_uncut_regions(tod);
   return mat;
 }
+/*--------------------------------------------------------------------------------*/
+void get_tod_cut_regions(mbTOD *tod)
+{
+  if (tod->uncuts==NULL)
+    get_tod_uncut_regions(tod);
+  tod->cuts_as_uncuts=get_cut_regions(tod);
+}
+
+
 /*--------------------------------------------------------------------------------*/
 void get_tod_uncut_regions(mbTOD *tod)
 {
@@ -1626,6 +1654,21 @@ actData inline calc_srcamp(actData ra, actData dec, actData srcra, actData srcde
   if (fabs(ddec)<maxdist) {
     actData dra=srcra-ra;
     if (fabs(dra)*cosdec<maxdist) {
+#if 1
+      actData ss=sin(0.5*ddec);
+      ss=ss*ss;
+      actData ss2=sin(0.5*(dra));
+      actData cc=cos(dec)*cosdec*ss2*ss2;
+      actData mydist=2*asin(sqrt(ss+cc));
+
+      //now do a linear interpolation                                                                                                             
+      if (mydist<maxdist) {
+	int ibin=mydist/dtheta;
+	actData frac=mydist-ibin*dtheta;
+	return (beam[ibin]*(1-frac)+beam[ibin+1]*frac);
+      }
+
+#else
       actData ss=sin5(0.5*ddec);
       ss=ss*ss;
       actData ss2=sin5(0.5*(dra));
@@ -1639,9 +1682,31 @@ actData inline calc_srcamp(actData ra, actData dec, actData srcra, actData srcde
 	actData frac=mydist-ibin*dtheta;
 	return (beam[ibin]*(1-frac)+beam[ibin+1]*frac);
       }
+#endif
     }
+
   }
   return 0;
+}
+/*--------------------------------------------------------------------------------*/
+actData inline calc_srcamp_oversamp(int i, actData *ra, actData *dec,  actData srcra, actData srcdec, const actData *beam, actData dtheta, int nbeam, actData cosdec, int ndata, int oversamp)
+{
+  if ((oversamp<=1)||(i==0)||(i==ndata-1)) {
+    return calc_srcamp(ra[i],dec[i],srcra,srcdec,beam,dtheta,nbeam,cosdec);
+  }
+  actData fac=0;
+  actData ra1=0.5*(ra[i]+ra[i-1]);
+  actData dec1=0.5*(dec[i]+dec[i-1]);
+  actData ra2=0.5*(ra[i]+ra[i+1]);
+  actData dec2=0.5*(dec[i]+dec[i+1]);
+  actData dra=(ra2-ra1)/(oversamp-1);
+  actData ddec=(dec2-dec1)/(oversamp-1);
+
+  for (int j=0;j<oversamp;j++) {
+    fac+=calc_srcamp(ra1+dra*j,dec1+ddec*j,srcra,srcdec,beam,dtheta,nbeam,cosdec);
+  }
+  return fac/oversamp;
+
 }
 /*--------------------------------------------------------------------------------*/
 void add_src2tod(mbTOD *tod, actData ra, actData dec, actData src_amp, const actData *beam, actData dtheta, int nbeam, int oversamp)
@@ -1671,6 +1736,7 @@ void add_src2tod(mbTOD *tod, actData ra, actData dec, actData src_amp, const act
 	
 	tt=omp_get_wtime();
 	for (int i=0;i<tod->ndata;i++) {
+	  
 	  actData fac=0;
 	  if ((i==0)||(i==tod->ndata-1)||(oversamp<=1))
 	    tod->data[det][i]+=src_amp*calc_srcamp(scratch->ra[i],scratch->dec[i],ra,dec,beam,dtheta,nbeam,cosdec);
@@ -1730,12 +1796,13 @@ void add_srcvec2tod(mbTOD *tod, actData *ra_in, actData *dec_in, actData *src_am
   int nsrc=0;
   
   for (int i=0;i<nsrc_in;i++) 
-    if (tod_hits_source(ra_in[i],dec_in[i],nbeam*dtheta,tod)) {
-      ra[nsrc]=ra_in[i];
-      dec[nsrc]=dec_in[i];
-      src_amp[nsrc]=src_amp_in[i];
-      nsrc++;
-    }
+    if (src_amp_in[i]!=0)
+      if (tod_hits_source(ra_in[i],dec_in[i],nbeam*dtheta,tod)) {
+	ra[nsrc]=ra_in[i];
+	dec[nsrc]=dec_in[i];
+	src_amp[nsrc]=src_amp_in[i];
+	nsrc++;
+      }
   
   actData tpos=0,tdist=0;
   
@@ -1760,45 +1827,112 @@ void add_srcvec2tod(mbTOD *tod, actData *ra_in, actData *dec_in, actData *src_am
 
 	  tt=omp_get_wtime();
 
-	  for (int src=0;src<nsrc;src++)
-	    if (oversamp<=1) {
-	      for (int i=0;i<tod->ndata;i++)
-		tod->data[det][i]+=src_amp[src]*calc_srcamp(scratch->ra[i],scratch->dec[i],ra[src],dec[src],beam,dtheta,nbeam,cosdec[src]);
-	    }
-	    else  {
-	      tod->data[det][0]+=src_amp[src]*calc_srcamp(scratch->ra[0],scratch->dec[0],ra[src],dec[src],beam,dtheta,nbeam,cosdec[src]);
-	      for (int i=1;i<tod->ndata-1;i++) {
-		actData fac=0;	    
-		actData ra1=0.5*(scratch->ra[i]+scratch->ra[i-1]);
-		actData dec1=0.5*(scratch->dec[i]+scratch->dec[i-1]);
-		actData ra2=0.5*(scratch->ra[i]+scratch->ra[i+1]);
-		actData dec2=0.5*(scratch->dec[i]+scratch->dec[i+1]);
-		actData dra=(ra2-ra1)/(oversamp-1);
-		actData ddec=(dec2-dec1)/(oversamp-1);
-		for (int j=0;j<oversamp;j++) {
-		  fac+=calc_srcamp(ra1+dra*j,dec1+ddec*j,ra[src],dec[src],beam,dtheta,nbeam,cosdec[src]); 
-		}
-		tod->data[det][i]+=src_amp[src]*fac/oversamp;
-				
-	      }
-	      tod->data[det][tod->ndata-1]+=src_amp[src]*calc_srcamp(scratch->ra[tod->ndata-1],scratch->dec[tod->ndata-1],ra[src],dec[src],beam,dtheta,nbeam,cosdec[src]);
-	      	      
-	    }
-	  tdist+=omp_get_wtime()-tt;
-
+	  for (int src=0;src<nsrc;src++) {
+	    for (int i=0;i<tod->ndata;i++)
+	      tod->data[det][i]+=src_amp[src]*calc_srcamp_oversamp(i,scratch->ra,scratch->dec,ra[src],dec[src],beam,dtheta,nbeam,cosdec[src],tod->ndata,oversamp); 	  
+	  }
 	}
       }
       free(cosdec);
       destroy_pointing_fit_scratch(scratch);    
     }
-  printf("distance and position times were %8.4f %8.4f\n",tpos,tdist);
+  //printf("distance and position times were %8.4f %8.4f\n",tpos,tdist);
 
   free(ra);
   free(dec);
   free(src_amp);
   
 }
+
 /*--------------------------------------------------------------------------------*/
+
+void tod2srcvec(actData *src_amp_out,mbTOD *tod, actData *ra_in, actData *dec_in, int nsrc_in,const actData *beam, actData dtheta, int nbeam, int oversamp)
+//Add a source with amplitude src_amp at (ra,dec) into the timestreams in TOD
+//eventually, oversamp will evaluate the beam at many places per sample
+{
+  if (!tod->have_data) {
+    fprintf(stderr,"TOD mising data in add_src2tod.\n");
+    return;
+  }
+  
+  actData *ra=vector(nsrc_in);
+  actData *dec=vector(nsrc_in);
+  int *indvec=(int *)malloc(sizeof(int)*nsrc_in);
+
+
+  int nsrc=0;
+  
+  for (int i=0;i<nsrc_in;i++) 
+    if (tod_hits_source(ra_in[i],dec_in[i],nbeam*dtheta,tod)) {
+      ra[nsrc]=ra_in[i];
+      dec[nsrc]=dec_in[i];
+      indvec[nsrc]=i;
+      nsrc++;
+    }
+  
+  if (nsrc>0)     
+#pragma omp parallel shared(tod,ra,dec,indvec,src_amp_out,beam,dtheta,nbeam,oversamp,nsrc) default(none) 
+    {
+      actData tt;
+      actData *src_amp=vector(nsrc);
+      memset(src_amp,0,sizeof(actData)*nsrc);
+
+
+      actData maxdist=dtheta*(nbeam-1);
+      actData maxra=maxdist/cos(0.5*(tod->decmin+tod->decmax));
+      PointingFitScratch *scratch=allocate_pointing_fit_scratch(tod);
+      actData *cosdec=vector(nsrc);
+      for (int i=0;i<nsrc;i++)
+	cosdec[i]=cos(dec[i]);
+#pragma omp for schedule(dynamic,1)
+      for (int det=0;det<tod->ndet;det++) {
+	if (!mbCutsIsAlwaysCut(tod->cuts,tod->rows[det],tod->cols[det])) {
+	  get_radec_from_altaz_fit_1det_coarse(tod,det,scratch);
+	  if (tod->kept_data) {
+	    int row=tod->rows[det];
+	    int col=tod->cols[det];
+	    mbUncut *uncut=tod->kept_data[row][col];
+
+	    for (int region=0;region<uncut->nregions;region++)
+	      for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++)
+		if (tod->data[det][j]!=0)
+		  for (int src=0;src<nsrc;src++)
+		    src_amp[src]+=tod->data[det][j]*calc_srcamp_oversamp(j,scratch->ra,scratch->dec,ra[src],dec[src],beam,dtheta,nbeam,cosdec[src],tod->ndata,oversamp);
+	  }
+	  else {
+	    if (tod->uncuts) {
+	      int row=tod->rows[det];
+	      int col=tod->cols[det];	      
+	      mbUncut *uncut=tod->uncuts[row][col];
+	      for (int src=0;src<nsrc;src++)
+		for (int region=0;region<uncut->nregions;region++)
+		  for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++)
+		    src_amp[src]+=tod->data[det][j]*calc_srcamp_oversamp(j,scratch->ra,scratch->dec,ra[src],dec[src],beam,dtheta,nbeam,cosdec[src],tod->ndata,oversamp);
+	    }
+	    else
+	      for (int src=0;src<nsrc;src++)
+		for (int j=0;j<tod->ndata;j++)
+		  src_amp[src]+=tod->data[det][j]*calc_srcamp_oversamp(j,scratch->ra,scratch->dec,ra[src],dec[src],beam,dtheta,nbeam,cosdec[src],tod->ndata,oversamp);
+	  }
+	}
+      }
+      free(cosdec);
+      destroy_pointing_fit_scratch(scratch);    
+#pragma omp critical
+      for (int src=0;src<nsrc;src++) {
+	src_amp_out[indvec[src]]+=src_amp[src];
+      }
+    }
+  
+  free(ra);
+  free(dec);
+  free(indvec);
+  
+}
+
+/*--------------------------------------------------------------------------------*/
+
+
 void clear_tod(mbTOD *tod)
 {
   pca_time tt;
