@@ -504,6 +504,117 @@ void purge_cut_detectors(mbTOD *tod)
 }
 
 /*--------------------------------------------------------------------------------*/
+int get_numel_cut(mbTOD *tod) //return how many elements have been cut in a TOD
+{
+  if (tod->cuts_as_vec) {
+    int det=tod->ndet-1;
+    while (1) {
+      int row=tod->rows[det];
+      int col=tod->cols[det];
+      mbUncut *ptr=tod->cuts_as_vec[row][col];
+      if (ptr)
+	if (ptr->nregions>0)
+	  return ptr->indexLast[ptr->nregions-1];
+      det--;
+      if (det==0)
+	return 0;
+    
+    }
+  }
+  return 0;
+    
+}
+
+/*--------------------------------------------------------------------------------*/
+mbUncut ***get_cut_regions_global_index(mbTOD *tod) 
+//make the globally referenced cuts indices, for a 1-d array for gapfilling.
+
+{
+  assert(tod);
+  assert(tod->cuts_as_uncuts);
+  
+  mbUncut **vec=(mbUncut **)malloc_retry(sizeof(mbUncut *)*tod->nrow*tod->ncol);
+  mbUncut ***mat=(mbUncut ***)malloc_retry(sizeof(mbUncut **)*tod->nrow);
+  memset(vec,0,sizeof(mbUncut**)*tod->nrow*tod->ncol);
+  for (int i=0;i<tod->nrow;i++)
+    mat[i]=vec+i*tod->ncol;
+  int **detsums=imatrix(tod->nrow,tod->ncol);
+  memset(detsums[0],0,sizeof(int)*tod->nrow*tod->ncol);
+
+
+
+  //sum up total # of cuts for each detector
+  for (int det=0;det<tod->ndet;det++) {
+    int row=tod->rows[det];
+    int col=tod->cols[det];
+    if (!mbCutsIsAlwaysCut(tod->cuts,row,col)) {
+      mbUncut *cut=tod->cuts_as_uncuts[row][col];
+      int tot=0;
+      for (int i=0;i<cut->nregions;i++)
+	tot+=(cut->indexLast[i]-cut->indexFirst[i]);
+      detsums[row][col]=tot;
+    }
+  }
+
+  //figure out total used to-date, shifting over one
+  int tmp=0;
+  for (int det=0;det<tod->ndet;det++) {
+    int row=tod->rows[det];
+    int col=tod->cols[det];
+    int tmp2=detsums[row][col];
+    detsums[row][col]=tmp;
+    tmp+=tmp2;
+  }
+  
+  
+  
+  //for (int row=0;row<tod->nrow;row++) 
+  // for (int col=0;col<tod->ncol;col++) 
+  for (int det=0;det<tod->ndet;det++) {
+    int row=tod->rows[det];
+    int col=tod->cols[det];
+    if (!mbCutsIsAlwaysCut(tod->cuts,row,col))
+      if (tod->cuts_as_uncuts[row][col]) {   //if the cuts are null, assuming nothing is cut.
+	//printf("working on %d %d\n",row,col);
+
+	
+	mbUncut *todcut=tod->cuts_as_uncuts[row][col];
+
+	mbUncut *cut=(mbUncut *)malloc(sizeof(mbUncut));
+	cut->nregions=todcut->nregions;
+	cut->indexFirst=(int *)malloc(sizeof(int)*todcut->nregions);
+	cut->indexLast=(int *)malloc(sizeof(int)*todcut->nregions);
+	mat[row][col]=cut;
+
+	
+	int cumsum=0;
+	for (int i=0;i<todcut->nregions;i++) {
+	  //printf("region is %d\n",i);
+	  //printf("limits are %d %d\n",todcut->indexFirst[i],todcut->indexLast[i]);
+	  cut->indexFirst[i]=cumsum+detsums[row][col];
+	  cut->indexLast[i]=cut->indexFirst[i]+(todcut->indexLast[i]-todcut->indexFirst[i]);
+	  //cut->indexLast[i]=cumsum+(todcut->indexLast[i]-todcut->indexFirst[i]);
+	  cumsum+=cut->indexLast[i]-cut->indexFirst[i];
+	}	
+      }
+  }
+  return mat;
+}
+/*--------------------------------------------------------------------------------*/
+
+void set_global_indexed_cuts(mbTOD *tod)
+{
+  assert(tod);
+  assert(tod->cuts);
+  if (!tod->uncuts) {
+    //fprintf(stderr,"Setting uncuts in set_global_indexed_cuts.  Maybe not what you want to do.\n");
+    get_tod_uncut_regions(tod);
+  }
+  if (!tod->cuts_as_uncuts)
+    get_tod_cut_regions(tod);
+  tod->cuts_as_vec=get_cut_regions_global_index(tod);
+}
+/*--------------------------------------------------------------------------------*/
 mbUncut ***get_cut_regions(mbTOD *tod) 
 //calculate the cut regions a la uncut regions and return a matrix to 'em.
 //preferred form for gap-filling
@@ -513,12 +624,18 @@ mbUncut ***get_cut_regions(mbTOD *tod)
   
   mbUncut **vec=(mbUncut **)malloc_retry(sizeof(mbUncut *)*tod->nrow*tod->ncol);
   mbUncut ***mat=(mbUncut ***)malloc_retry(sizeof(mbUncut **)*tod->nrow);
+  memset(vec,0,sizeof(mbUncut**)*tod->nrow*tod->ncol);
+
   for (int i=0;i<tod->nrow;i++)
     mat[i]=vec+i*tod->ncol;
 
   for (int i=0;i<tod->nrow;i++)
-    for (int j=0;j<tod->ncol;j++)
-      mat[i][j]=mbCutsInvertUncut(tod->uncuts[i][j],tod->ndata-1);
+    for (int j=0;j<tod->ncol;j++) {
+      //printf("working on detector %d %d\n",i,j);
+      if (tod->uncuts[i][j]==NULL)
+	printf("uncuts is null.\n");
+      mat[i][j]=mbCutsInvertUncut(tod->uncuts[i][j],tod->ndata);
+    }
   return mat;
 }
 /*--------------------------------------------------------------------------------*/
@@ -1529,6 +1646,66 @@ void calculate_avec(mbTOD *tod, int mydet, actData *avec)
 {
   return;
 }
+
+/*--------------------------------------------------------------------------------*/
+int cutvec2tod(mbTOD *tod, actData *cutvec)
+{
+  if (!tod->have_data) {
+    fprintf(stderr,"missing data in tod in cutvec2tod\n");
+    return 1;
+  }
+  if (tod->cuts_as_vec==NULL) {
+    fprintf(stderr,"Error, tod does not contain cuts_as_vec in cutvec2tod.\n");
+    return 1;
+  }
+  if (tod->cuts_as_uncuts==NULL) {
+    fprintf(stderr,"Error, tod does not contain cuts_as_uncut in cutvec2tod.\n");
+    return 1;    
+  }
+  
+  int ncopy=0;
+  for (int det=0;det<tod->ndet;det++) 
+    if (tod->cuts_as_vec[tod->rows[det]][tod->cols[det]]!=NULL) {
+      mbUncut *cut=tod->cuts_as_vec[tod->rows[det]][tod->cols[det]];
+      mbUncut *loc_cut=tod->cuts_as_uncuts[tod->rows[det]][tod->cols[det]];
+      for (int i=0;i<cut->nregions;i++)  {
+	memcpy(tod->data[det]+loc_cut->indexFirst[i],cutvec+cut->indexFirst[i],sizeof(actData)*(cut->indexLast[i]-cut->indexFirst[i])); 
+	ncopy+=cut->indexLast[i]-cut->indexFirst[i];
+      }
+      
+    }
+  return 0;
+}
+
+/*--------------------------------------------------------------------------------*/
+int tod2cutvec(mbTOD *tod, actData *cutvec)
+{
+  //printf("greetings from tod2cutvec.\n");
+  if (!tod->have_data) {
+    fprintf(stderr,"missing data in tod in tod2cutvec\n");
+    return 1;
+  }
+  if (tod->cuts_as_vec==NULL) {
+    fprintf(stderr,"Error, tod does not contain cuts_as_vec in tod2cutvec.\n");
+    return 1;
+  }
+  if (tod->cuts_as_uncuts==NULL) {
+    fprintf(stderr,"Error, tod does not contain cuts_as_uncut in tod2cutvec.\n");
+    return 1;    
+  }
+  
+  for (int det=0;det<tod->ndet;det++) 
+    if (tod->cuts_as_vec[tod->rows[det]][tod->cols[det]]!=NULL) {
+      //printf("det is %d\n",det);
+      mbUncut *cut=tod->cuts_as_vec[tod->rows[det]][tod->cols[det]];
+      mbUncut *loc_cut=tod->cuts_as_uncuts[tod->rows[det]][tod->cols[det]];
+      for (int i=0;i<cut->nregions;i++) 
+	memcpy(cutvec+cut->indexFirst[i],tod->data[det]+loc_cut->indexFirst[i],sizeof(actData)*(cut->indexLast[i]-cut->indexFirst[i]));
+      
+    }
+  return 0;
+}
+
 /*--------------------------------------------------------------------------------*/
 void map2det(const MAP *map, const mbTOD *tod, actData *vec, int *ind, int det, PointingFitScratch *scratch)
 //add a map into a vector.
@@ -2119,6 +2296,31 @@ void window_data(mbTOD *tod)
       tod->data[i][j]*=window[j];
     for (int j=0;j<nsamp;j++)
       tod->data[i][nn+j]*=window2[j];    
+  }  
+
+  free(window);
+  free(window2);
+}
+/*--------------------------------------------------------------------------------*/
+void unwindow_data(mbTOD *tod)
+{
+  assert(tod->have_data);
+  int nsamp=tod->n_to_window;
+  if (nsamp<=0)
+    return;
+  actData *window=vector(nsamp);
+  actData *window2=vector(nsamp);
+  for (int i=0;i<nsamp;i++) {
+    window[i]=0.5-0.5*cos(M_PI*i/(nsamp+0.0));
+    window2[i]=0.5+0.5*cos(M_PI*i/(nsamp+0.0));
+  }
+  int nn=tod->ndata-nsamp;
+#pragma omp parallel for shared(tod,window,nsamp)
+  for (int i=0;i<tod->ndet;i++) {
+    for (int j=1;j<nsamp;j++)
+      tod->data[i][j]/=window[j];
+    for (int j=0;j<nsamp-1;j++)
+      tod->data[i][nn+j]/=window2[j];    
   }  
 
   free(window);

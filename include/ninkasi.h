@@ -141,6 +141,7 @@ void cut_tod_ends(mbTOD *tod,actData tcut);
 void set_tod_window(mbTOD *tod,actData tcut);
 
 void window_data(mbTOD *tod);
+void unwindow_data(mbTOD *tod);
 void apply_preconditioner( MAPvec *maps,MAPvec *weights,PARAMS *params);
 void dump_data(mbTOD *tod, char *fname);
 void destroy_map(MAP *map);
@@ -201,6 +202,15 @@ void map_axpy(MAP *y, MAP *x, actData a);
 bool is_det_listed(const mbTOD *tod, const PARAMS *params, int det);
 void purge_cut_detectors(mbTOD *tod);
 mbUncut ***get_uncut_regions(mbTOD *tod);
+int get_numel_cut(mbTOD *tod);
+void set_global_indexed_cuts(mbTOD *tod);
+mbUncut ***get_cut_regions(mbTOD *tod);
+void get_tod_cut_regions(mbTOD *tod);
+mbUncut ***get_cut_regions_global_index(mbTOD *tod);
+int tod2cutvec(mbTOD *tod, actData *cutvec);
+int cutvec2tod(mbTOD *tod, actData *cutvec);
+
+
 void get_tod_uncut_regions(mbTOD *tod);
 void reverse_tod_uncut_regions(mbTOD *tod);
 void decimate_uncut_regions(mbTOD *tod);

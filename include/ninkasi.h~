@@ -201,6 +201,15 @@ void map_axpy(MAP *y, MAP *x, actData a);
 bool is_det_listed(const mbTOD *tod, const PARAMS *params, int det);
 void purge_cut_detectors(mbTOD *tod);
 mbUncut ***get_uncut_regions(mbTOD *tod);
+int get_numel_cut(mbTOD *tod);
+void set_global_indexed_cuts(mbTOD *tod);
+mbUncut ***get_cut_regions(mbTOD *tod);
+void get_tod_cut_regions(mbTOD *tod);
+mbUncut ***get_cut_regions_global_index(mbTOD *tod);
+int tod2cutvec(mbTOD *tod, actData *cutvec);
+int cutvec2tod(mbTOD *tod, actData *cutvec);
+
+
 void get_tod_uncut_regions(mbTOD *tod);
 void reverse_tod_uncut_regions(mbTOD *tod);
 void decimate_uncut_regions(mbTOD *tod);
@@ -218,6 +227,7 @@ void *malloc_retry(size_t n);
 actData how_far_am_i_from_radec_radians(actData ra, actData dec, mbTOD *tod);
 actData how_far_am_i_from_radec(actData rah,actData ram,actData ras,actData dd,actData dm,actData ds,mbTOD *tod);
 actData  *how_far_am_i_from_radec_radians_vec( actData *ra, actData *dec, int npt, mbTOD *tod);
+int tod_hits_source(actData ra, actData dec, actData dist, mbTOD *tod);
 void add_src2tod(mbTOD *tod, actData ra, actData dec, actData src_amp, const actData *beam, actData dtheta, int nbeam, int oversamp);
 void add_srcvec2tod(mbTOD *tod, actData *ra, actData *dec, actData *src_amp, int nsrc,const actData *beam, actData dtheta, int nbeam, int oversamp);
 void tod2srcvec(actData *src_amp_out,mbTOD *tod, actData *ra_in, actData *dec_in, int nsrc_in,const actData *beam, actData dtheta, int nbeam, int oversamp);

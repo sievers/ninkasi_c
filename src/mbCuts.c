@@ -453,6 +453,9 @@ mbUncutFree( mbUncut *uncut )
     psFree( uncut->indexLast );
 }
 
+
+/*--------------------------------------------------------------------------------*/
+
 ///Invert (i.e. get cuts from uncuts) an mbUncut object for a detector
 mbUncut *mbCutsInvertUncut(mbUncut *uncut, int ndata)
 {
@@ -464,19 +467,29 @@ mbUncut *mbCutsInvertUncut(mbUncut *uncut, int ndata)
   cut->indexFirst=(int *)malloc(sizeof(int)*(uncut->nregions+2));
   cut->indexLast=(int *)malloc(sizeof(int)*(uncut->nregions+2));
   cut->nregions=0;
+  //printf("uncut nregions is %d\n",uncut->nregions);
+  //for (int i=0;i<uncut->nregions;i++)
+    //printf("region %d is %5d %5d\n",i,uncut->indexFirst[i],uncut->indexLast[i]);
+  if (uncut->nregions==0) {
+    cut->nregions=1;
+    cut->indexFirst[0]=0;
+    cut->indexLast[0]=ndata;
+    return cut;
+  }
+
   if (uncut->indexFirst >0) {
     cut->indexFirst[cut->nregions]=0;
     cut->indexLast[cut->nregions]=uncut->indexFirst[0]-1;
     cut->nregions++;
   }
   for (int i=0;i<uncut->nregions-1;i++) {
-    cut->indexFirst[cut->nregions]=uncut->indexLast[i]+1;
-    cut->indexLast[cut->nregions]=uncut->indexFirst[i+1]-1;
+    cut->indexFirst[cut->nregions]=uncut->indexLast[i];
+    cut->indexLast[cut->nregions]=uncut->indexFirst[i+1];
     cut->nregions++;    
   }
-  if (uncut->indexLast[uncut->nregions-1]<ndata-1) {
-    cut->indexFirst[cut->nregions]=uncut->indexLast[uncut->nregions-1]+1;
-    cut->indexLast[cut->nregions]=ndata-1;
+  if (uncut->indexLast[uncut->nregions-1]<ndata) {
+    cut->indexFirst[cut->nregions]=uncut->indexLast[uncut->nregions-1];
+    cut->indexLast[cut->nregions]=ndata;
     cut->nregions++;
   }
   return cut;
