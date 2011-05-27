@@ -1041,8 +1041,37 @@ void nkDeButterworth(mbTOD *tod)
   
 }
 
+
+
 /*--------------------------------------------------------------------------------*/
 void nkReButterworth(mbTOD *tod)
+{
+  assert(tod);
+  assert(tod->data);
+
+    actComplex **data_ft=fft_all_data(tod);
+#pragma omp parallel shared(tod,data_ft) default(none)
+    {
+      int nn=fft_real2complex_nelem(tod->ndata);
+      actComplex *filt=nkMCEButterworth(tod);
+#pragma omp for
+      for (int i=0;i<tod->ndet;i++)
+	if (!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i])) {
+	  for (int j=0;j<nn;j++)
+	    //data_ft[i][j]/=filt[j];  //no normalization required as the all_data transforms do it.	  
+	    data_ft[i][j]*=filt[j];  
+	}
+      free(filt);
+    }
+    
+    ifft_all_data(tod,data_ft);
+    free(data_ft[0]);
+    free(data_ft);
+  
+}
+
+/*--------------------------------------------------------------------------------*/
+void nkReButterworth_old(mbTOD *tod)
 {
   assert(tod);
   assert(tod->data);
@@ -1121,6 +1150,32 @@ void nkDeconvolveTimeConstants(mbTOD *tod)
 }
 /*--------------------------------------------------------------------------------*/
 void nkReconvolveTimeConstants(mbTOD *tod)
+{
+  assert(tod);
+  assert(tod->data);
+  assert(tod->time_constants);
+  actComplex **data_ft=fft_all_data(tod);
+#pragma omp parallel shared(tod,data_ft) default(none)
+  {
+    int nn=fft_real2complex_nelem(tod->ndata);
+    actData *freqs=get_freq_vec(tod);
+#pragma omp for 
+    for (int i=0;i<tod->ndet;i++) {
+      if (!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i])) {
+        actComplex myfac=2*M_PI*I*tod->time_constants[tod->rows[i]][tod->cols[i]];
+        for (int j=0;j<nn;j++)
+          data_ft[i][j]/=(1+myfac*freqs[j]);
+	
+      }
+    }
+    free(freqs);
+  }
+  ifft_all_data(tod,data_ft);
+  free(data_ft[0]);
+  free(data_ft);
+}
+/*--------------------------------------------------------------------------------*/
+void nkReconvolveTimeConstants_old(mbTOD *tod)
 {
   assert(tod);
   assert(tod->data);
