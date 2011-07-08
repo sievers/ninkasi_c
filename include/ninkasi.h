@@ -192,7 +192,9 @@ void allocate_tod_storage(mbTOD *tod);
 void tod2mapset(MAPvec *maps, mbTOD *tod, PARAMS *params);
 void assign_tod_value(mbTOD *tod, actData val);
 void free_tod_storage(mbTOD *tod);
+void map2det_scaled(const MAP *map, const mbTOD *tod, actData *vec, actData scale_fac, int *ind, int det, PointingFitScratch *scratch);
 void tod2map(MAP *map, mbTOD *tod, PARAMS *params);
+actData tod_times_map(const MAP *map, const mbTOD *tod, PARAMS *params);
 
 int read_tod_data(mbTOD *tod);
 MAP *make_map_copy(MAP *map);

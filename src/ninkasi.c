@@ -1600,6 +1600,80 @@ void tod2map(MAP *map, mbTOD *tod, PARAMS *params)
   } 
 }
 /*--------------------------------------------------------------------------------*/
+
+actData tod_times_map(const MAP *map, const mbTOD *tod, PARAMS *params)
+{
+
+
+  assert(map);
+  assert(map->projection);
+
+#if 0
+  int nproc;
+#pragma omp parallel shared(nproc) default(none)
+#pragma omp single
+  nproc=omp_get_num_threads();
+
+  if (nproc*map->npix*sizeof(actData)>tod->ndata*tod->ndet*sizeof(int)) {
+    //printf("doing index-saving projection.\n");
+    tod2map_nocopy(map,tod,params);
+    return;
+  }
+  //else
+  // printf("doing old projection.\n");
+
+
+
+  if (!map->have_locks) {
+    //printf("setting up locks.\n");
+    setup_omp_locks(map);
+    //printf("set them up.\n");
+    
+  }
+#endif
+  actData tot=0;
+#pragma omp parallel shared(tod,map,params) reduction(+:tot) default(none)
+  { 
+
+    //MAP *mymap=make_blank_map_copy(map);
+    int *ind=(int *)malloc_retry(sizeof(int)*tod->ndata);
+    PointingFitScratch *scratch=allocate_pointing_fit_scratch(tod);
+
+#pragma omp for nowait
+    for (int i=0;i<tod->ndet;i++) { 
+      if ((!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i]))&&(is_det_listed(tod,params,i))) {
+	get_pointing_vec_new(tod,map,i,ind,scratch);
+	if (tod->kept_data) {
+	  int row=tod->rows[i];
+	  int col=tod->cols[i];
+	  mbUncut *uncut=tod->kept_data[row][col];
+	  for (int region=0;region<uncut->nregions;region++) 
+	    for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++)
+	      tot+=map->map[ind[j]]*tod->data[i][j];	  
+	}
+	else {
+	  if (tod->uncuts) {
+	    int row=tod->rows[i];
+	    int col=tod->cols[i];
+	    mbUncut *uncut=tod->uncuts[row][col];
+	    for (int region=0;region<uncut->nregions;region++) 
+	      for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++)
+		tot+=map->map[ind[j]]*tod->data[i][j];
+	  }
+	  else 
+	    for (int j=0;j<tod->ndata;j++) 
+	      tot+=map->map[ind[j]]*tod->data[i][j];
+	}
+      }
+    }
+    
+    free(ind);
+    destroy_pointing_fit_scratch(scratch);
+  } 
+
+  return tot;
+}
+/*--------------------------------------------------------------------------------*/
 void tod2mapset(MAPvec *maps, mbTOD *tod, PARAMS *params)
 {
   for (int i=0;i<maps->nmap;i++)
@@ -1718,6 +1792,18 @@ void map2det(const MAP *map, const mbTOD *tod, actData *vec, int *ind, int det, 
   }
   
 } 
+/*--------------------------------------------------------------------------------*/
+void map2det_scaled(const MAP *map, const mbTOD *tod, actData *vec, actData scale_fac, int *ind, int det, PointingFitScratch *scratch)
+//add a map into a vector.
+{
+  //get_pointing_vec(tod,map,det,ind);
+  get_pointing_vec_new(tod,map,det,ind,scratch);
+  
+  for (int j=0;j<tod->ndata;j++) {
+    vec[j]+=map->map[ind[j]]*scale_fac;
+  }
+  
+} 
 
 /*--------------------------------------------------------------------------------*/
 long is_tod_inbounds(const MAP *map, mbTOD *tod,const PARAMS *params)
@@ -1769,8 +1855,11 @@ void map2tod(const MAP *map, mbTOD *tod,const PARAMS *params)
 {
   
   assert(tod->have_data);
+  actData scale_fac=1.0;
+  if (params)
+    scale_fac=*((actData *)params);
 
-#pragma omp parallel shared(tod,map,stderr) default(none) 
+#pragma omp parallel shared(tod,map,stderr,scale_fac) default(none) 
  {
    PointingFitScratch *scratch=allocate_pointing_fit_scratch(tod);
    int *ind=(int *)malloc_retry(sizeof(int)*tod->ndata);
@@ -1779,7 +1868,10 @@ void map2tod(const MAP *map, mbTOD *tod,const PARAMS *params)
    for (int i=0;i<tod->ndet;i++) {
      //fprintf(stderr,"i is %d on %d\n",i,omp_get_thread_num());
      if (!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i])) {
-       map2det(map,tod,tod->data[i],ind,i, scratch);
+       if (scale_fac==1)
+	 map2det(map,tod,tod->data[i],ind,i, scratch);
+       else
+	 map2det_scaled(map,tod,tod->data[i],scale_fac,ind,i, scratch);
      }
    }
    destroy_pointing_fit_scratch(scratch);   
