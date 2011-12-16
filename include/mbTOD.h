@@ -111,6 +111,8 @@ typedef actArray actFilter;
 
 
 typedef struct {
+  int todtype;
+  void *generic;
   actFilter band;      //!< enum: ACT_145, ACT_215, or ACT_265
   char *dirfile;
 

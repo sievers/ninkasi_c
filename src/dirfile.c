@@ -1,5 +1,7 @@
 
+#ifndef MAKEFILE_HAND
 #include "config.h"
+#endif
 
 #include <assert.h>
 #include <ctype.h>
@@ -73,7 +75,6 @@ dirfile_read_channel( char typechar, const struct FormatType *F,
         const char *channelname, int *nsamples_out )
 {
     int status = 0;
-
     /*
     int nframes = GetNFrames( F, &status, channelname );
     if ( status != GD_E_OK )
@@ -91,7 +92,6 @@ dirfile_read_channel( char typechar, const struct FormatType *F,
         return NULL;
     }
     assert( nsamples > 0 );
-
     int samples_per_frame = GetSamplesPerFrame( F, channelname, &status );
     if ( status != GD_E_OK )
     {
@@ -104,12 +104,10 @@ dirfile_read_channel( char typechar, const struct FormatType *F,
     size_t nbytes = nsamples * bytes_per_sample(typechar);
 
     void *data = malloc( nbytes );
-
     *nsamples_out = GetData( F, channelname, 0, 0,
             nsamples / samples_per_frame,
             nsamples % samples_per_frame,
             typechar, data, &status );
-
     if ( status != GD_E_OK || *nsamples_out <= 0 )
     {
         dirfile_print_errstatus( status );
@@ -210,14 +208,13 @@ read_dirfile_tod_header( const char *filename )
   //printf("reading .%s.\n",filename);
     assert( filename != NULL );
 
+
     int status, n;
     //printf("reading format from %s\n",filename);
     struct FormatType *format = GetFormat( filename, NULL, &status );
     assert( format != NULL );
-
     mbTOD *tod = (mbTOD *) calloc( 1,sizeof(mbTOD) );
     tod->dirfile=strdup(filename);
-
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // alt/az
 
@@ -234,7 +231,6 @@ read_dirfile_tod_header( const char *filename )
     for (int i=0;i<n;i++)
       tod->alt[i]=alt[i];
     free(alt);
-
 
 #else
     tod->az = dirfile_read_float_channel( format, "Enc_Az_Deg", &n );
@@ -257,12 +253,10 @@ read_dirfile_tod_header( const char *filename )
     // ctime
 
     uint32_t s0, us0, s1, us1;
-
     s0 = dirfile_read_uint32_sample( format, "cpu_s", 0 );
     s1 = dirfile_read_uint32_sample( format, "cpu_s", tod->ndata-1 );
     us0 = dirfile_read_uint32_sample( format, "cpu_us", 0 );
     us1 = dirfile_read_uint32_sample( format, "cpu_us", tod->ndata-1 );
-
     //printf("s0,s1, us0, us1 are %8d %8d %8d %8d\n",s0,s1,us0,us1);
     
 
@@ -280,7 +274,6 @@ read_dirfile_tod_header( const char *filename )
     tod->ncol = 0;
     tod->rows = malloc( ACT_ARRAY_MAX_DETECTORS*sizeof(int) );
     tod->cols = malloc( ACT_ARRAY_MAX_DETECTORS*sizeof(int) );
-
     char tesfield[] = "tesdatar00c00";
 
     for ( int r = 0; r < ACT_ARRAY_MAX_ROWS; r++ )
@@ -296,7 +289,6 @@ read_dirfile_tod_header( const char *filename )
             tod->ncol = MAX( tod->ncol, c+1 );
         }
     }
-
     tod->rows = (int *) realloc( tod->rows, tod->ndet*sizeof(int) );
     tod->cols = (int *) realloc( tod->cols, tod->ndet*sizeof(int) );
 
@@ -371,7 +363,6 @@ read_dirfile_tod_header_decimate( const char *filename , int decimate )
 {
   //fprintf(stderr,"inside read_dirfile_tod_header_decimate.\n");
   mbTOD *tod=read_dirfile_tod_header(filename);
-
   if (decimate==0)
     return tod;
   

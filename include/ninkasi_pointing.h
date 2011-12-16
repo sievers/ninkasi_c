@@ -1,6 +1,8 @@
 #ifndef NINKASI_POINTING_H
 #define NINKASI_POINTING_H
+#ifndef MAKEFILE_HAND
 #include "config.h"
+#endif
 #include "ninkasi.h"
 #include "ninkasi_mathutils.h"
 

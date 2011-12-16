@@ -4,7 +4,10 @@
 
 
 
+#ifndef MAKEFILE_HAND
 #include "config.h"
+#endif
+
 #include "ninkasi_defs.h"
 
 
@@ -49,6 +52,9 @@ actData mygasdev(unsigned *seed);
 actData myrand(unsigned *seed);
 
 void act_gemm(char transa, char transb, int m, int n, int k, actData alpha, actData *a, int lda, actData *b, int ldb, actData beta, actData *c, int ldc);
+
+actData *legendre_fit(actData *data, int ndata, int ord);
+void legendre_eval(actData *data, int ndata, actData *fitp, int ord);
 
 
 /*--------------------------------------------------------------------------------*/

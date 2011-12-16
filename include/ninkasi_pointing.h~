@@ -16,7 +16,7 @@ typedef struct {
   actData *alt_coarse;
   actData *ra_coarse;
   actData *dec_coarse;
-
+  actData *time_coarse;
   PointingFit *pointing_fit; 
 } PointingFitScratch;
 
@@ -33,6 +33,7 @@ void find_tod_radec_lims(mbTOD *tod);
 void set_tod_starting_altaz_ctime(mbTOD *tod, actData alt, actData az, double ctime);
 
 
+void get_radec_from_altaz_fit_tiled(const TiledPointingFit *tile, actData *alt, actData *az, actData *ctime, actData *ra, actData *dec, int npoint);
 void get_radec_from_altaz_exact_1det(const mbTOD *tod,int det,    PointingFitScratch *scratch);
 void get_radec_from_altaz_fit_1det(const mbTOD *tod,int det, PointingFitScratch *scratch);
 void get_radec_from_altaz_fit_1det_coarse(const mbTOD *tod, int det, PointingFitScratch *scratch);

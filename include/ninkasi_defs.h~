@@ -27,6 +27,13 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+
+
+#ifndef  RAD2DEG
+#define RAD2DEG 57.2957795130823
+#endif
+
+
 typedef struct timeval pca_time;
 
 typedef pca_time mbTimeValue;

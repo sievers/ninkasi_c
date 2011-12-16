@@ -1,5 +1,7 @@
 //Module to turn RA/Dec into map coordinates.
+#ifndef MAKEFILE_HAND
 #include "config.h"
+#endif
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>

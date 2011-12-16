@@ -1,5 +1,7 @@
 
+#ifndef MAKEFILE_HAND
 #include "config.h"
+#endif
 
 #include <assert.h>
 #include <math.h>

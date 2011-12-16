@@ -1,4 +1,6 @@
+#ifndef MAKEFILE_HAND
 #include "config.h"
+#endif
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -553,5 +555,57 @@ actData mygasdev(unsigned *seed)
   
 }
 
-
-
+/*--------------------------------------------------------------------------------*/
+static inline actData legendre_x(int i, int ndata)
+//calculate a [-1,1] value for i given ndata
+{
+  actData dx=i;
+  dx/=(ndata-1);
+  return 2*dx-1;
+}
+/*--------------------------------------------------------------------------------*/
+actData *legendre_fit(actData *data, int ndata, int ord)
+{
+  actData **vecs=matrix(ord,ndata);
+  for (int i=0;i<ndata;i++) {
+    actData x=legendre_x(i,ndata);
+    vecs[0][i]=1;
+    if (ord>1)
+      vecs[1][i]=x;
+    for (int j=1;j<ord-1;j++)
+      vecs[j+1][i]=((2*j+1)*x*vecs[j][i]-j*vecs[j-1][i])/(1+(actData)j);
+  }
+  actData *fitp=linfit(data,vecs,NULL,ndata,ord);
+  free(vecs[0]);
+  free(vecs);
+  return fitp;
+}
+/*--------------------------------------------------------------------------------*/
+void legendre_eval(actData *data, int ndata, actData *fitp, int ord)
+{
+  if (ord<=1) {
+    for (int i=0;i<ndata;i++)
+      data[i]=fitp[0];
+    return;
+  }
+  if (ord==2) {
+    for (int i=0;i<ndata;i++)
+      data[i]=fitp[0]+fitp[1]*legendre_x(i,ndata);
+    return;
+  }
+  for (int i=0;i<ndata;i++) {
+    actData tot=fitp[0];
+    actData x=legendre_x(i,ndata);
+    actData pold=1;
+    actData pcur=x;
+    actData pnext;
+    data[i]=fitp[0]+fitp[1]*x;
+    for (int j=1;j<ord-1;j++) {
+      pnext=((2*j+1)*x*pcur-j*pold)/((actData)j+1);
+      data[i]+=pnext*fitp[j+1];
+      pold=pcur;
+      pcur=pnext;
+    }
+  }
+  return;
+}

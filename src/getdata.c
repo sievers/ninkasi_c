@@ -21,7 +21,8 @@
 #include <math.h>
 
 #include <slimlib.h>
-#include <zzip/zzip.h>
+//#include <zzip/zzip.h>
+#include <zzip/lib.h>
 
 #include "getdata.h"
 
@@ -246,9 +247,9 @@ file_exists( const char *filename )
 }
 
 size_t
-file_size( const char *filename )
+ffile_size( const char *filename )
 {
-  //printf( "file_size: %s\n", filename );
+  //printf( "ffile_size: %s\n", filename );
     ZZIP_FILE *fp = zzip_fopen( filename, "r" );
     assert( fp != NULL ); 
     ZZIP_STAT stat;
@@ -2062,7 +2063,7 @@ int GetNFrames(const struct FormatType *F, int *error_code, const char *in_field
       return(0);
   } else
   {
-    st_size = file_size( raw_data_filename );
+    st_size = ffile_size( raw_data_filename );
   }
 
   nf = st_size/
@@ -2083,6 +2084,7 @@ int GetNSamples(const struct FormatType *F, int *error_code, const char *in_fiel
   long st_size;
   int nf;
 
+
   *error_code = GD_E_OK;
 
   if (!F || F->n_raw==0) {
@@ -2092,7 +2094,7 @@ int GetNSamples(const struct FormatType *F, int *error_code, const char *in_fiel
 
   /* load the first valid raw field, either as a regular or a slim file */
   snprintf(raw_data_filename, 2 * MAX_FILENAME_LENGTH + FIELD_LENGTH + 2,
-      "%s/%s", F->FileDirName, F->first_field.file);
+	   "%s/%s", F->FileDirName, F->first_field.file);
   //if (stat(raw_data_filename, &statbuf) < 0) {
   if ( !file_exists(raw_data_filename) ) {
     snprintf(raw_data_filename, 2 * MAX_FILENAME_LENGTH + FIELD_LENGTH + 2,
@@ -2102,7 +2104,7 @@ int GetNSamples(const struct FormatType *F, int *error_code, const char *in_fiel
       return(0);
   } else
   {
-    st_size = file_size( raw_data_filename );
+    st_size = ffile_size( raw_data_filename );
   }
 
   nf = st_size/F->first_field.size

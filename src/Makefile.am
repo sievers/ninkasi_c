@@ -1,1 +1,1 @@
-Makefile.am.nrao
+Makefile.am.nrao2

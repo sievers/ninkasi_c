@@ -1,7 +1,10 @@
 #ifndef NINKASI_DEFS_H
 #define  NINKASI_DEFS_H
 
+#ifndef MAKEFILE_HAND
 #include "config.h"
+#endif
+
 
 #include <fftw3.h>
 #include <complex.h>
