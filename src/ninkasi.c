@@ -27,6 +27,7 @@
 #endif
 
 #include "dirfile.h"
+#include "readtod.h"
 #include "astro.h"
 #include "mbCommon.h"
 #include "mbCuts.h"
@@ -508,6 +509,16 @@ void purge_cut_detectors(mbTOD *tod)
 /*--------------------------------------------------------------------------------*/
 int get_numel_cut(mbTOD *tod) //return how many elements have been cut in a TOD
 {
+  if (tod->cuts_fit_params) {
+    int dd=tod->ndet-1;
+    while (tod->cuts_fit_params[tod->rows[dd]][tod->cols[dd]]->nregions==0) {
+      dd--;
+      if (dd<0)
+	assert(1==0);
+    }
+    mbCutFitParams *params=tod->cuts_fit_params[tod->rows[dd]][tod->cols[dd]];
+    return params->starting_param[params->nregions-1]+params->nparams[params->nregions-1];
+  }
   if (tod->cuts_as_vec) {
     int det=tod->ndet-1;
     while (1) {
@@ -527,6 +538,117 @@ int get_numel_cut(mbTOD *tod) //return how many elements have been cut in a TOD
     
 }
 
+/*--------------------------------------------------------------------------------*/
+void setup_cutsfits_precon(mbTOD *tod)
+{
+  assert(tod);
+  assert(tod->cuts_fit_params);
+  actData *winvec=(actData *)malloc(sizeof(actData)*tod->ndata);
+  for (int i=0;i<tod->ndata;i++)
+    winvec[i]=1.0;
+  int nsamp=tod->n_to_window;
+  
+  //#define CUTFITS_DEBUG
+
+#if 0
+  if (nsamp>0) {
+    for (int i=0;i<nsamp;i++) {
+      winvec[i]=0.5-0.5*cos(M_PI*i/(nsamp+0.0));
+      winvec[i]=winvec[i]*winvec[i];
+      //window2[i]=0.5+0.5*cos(M_PI*i/(nsamp+0.0));
+      winvec[tod->ndata-i-1]=winvec[i];
+    }    
+  }
+#endif
+
+#pragma omp parallel for shared(tod,winvec,nsamp) default(none)
+  for (int det=0;det<tod->ndet;det++) {
+    mbCutFitParams *params=tod->cuts_fit_params[tod->rows[det]][tod->cols[det]];
+    mbUncut *cut=tod->cuts_as_uncuts[tod->rows[det]][tod->cols[det]];
+    params->precon=(actData ***)malloc(sizeof(actData **)*params->nregions);
+    for (int i=0;i<params->nregions;i++) {
+      int nelem=cut->indexLast[i]-cut->indexFirst[i];
+      actData **mat=legendre_mat(nelem,params->nparams[i]);
+#ifdef CUTFITS_DEBUG
+      for (int ii=0;ii<params->nparams[i];ii++)
+	for (int jj=0;jj<nelem;jj++) 
+	  if (!isfinite(mat[ii][jj])) {
+	    printf("Have a not-finite element on matrix element %d %d, segment  %d on detector %d %d with length %d\n",ii,jj,i,tod->rows[det],tod->cols[det],nelem);
+	    return;
+	  }
+#endif
+
+#ifdef CUTFITS_DEBUG
+      if (i==2) {
+	FILE *outfile=fopen("mat_temp.txt","w");
+	for (int ii=0;ii<nelem;ii++) {
+	  for (int jj=0;jj<params->nparams[i];jj++)
+	    fprintf(outfile,"%13.5e ",mat[jj][ii]);
+	  fprintf(outfile,"  %13.5e\n",winvec[ii+cut->indexFirst[i]]);
+	}
+	fclose(outfile);
+	return;
+      }
+#endif
+
+      actData **precon=matrix(params->nparams[i],params->nparams[i]);
+      for (int ii=0;ii<params->nparams[i];ii++)
+	for (int jj=ii;jj<params->nparams[i];jj++) {
+	  precon[ii][jj]=0;
+	  for (int kk=0;kk<nelem;kk++)
+	    precon[ii][jj]+=mat[ii][kk]*mat[jj][kk]*winvec[kk+cut->indexFirst[i]];
+	  precon[jj][ii]=precon[ii][jj];
+	}
+      
+#ifdef CUTFITS_DEBUG
+      for (int ii=0;ii<params->nparams[i];ii++)
+	for (int jj=0;jj<params->nparams[i];jj++) 
+	  if (!isfinite(precon[ii][jj])) {
+	    printf("Have a not-finite precon element on matrix element %d %d, segment  %d on detector %d %d with length %d\n",ii,jj,i,tod->rows[det],tod->cols[det],nelem);
+	    return;
+	  }
+
+      for (int ii=0;ii<params->nparams[i];ii++) {
+	for (int jj=0;jj<params->nparams[i];jj++)
+	  printf("%13.5e ",precon[ii][jj]);
+	printf("\n");
+      }
+#endif
+      int info=invert_posdef_mat(precon,params->nparams[i]);
+      if (info) {
+	printf("error inverting segment %d on detector %d %d %d\n",i,det,tod->rows[det],tod->cols[det]);
+	//return;
+      }
+      for (int ii=0;ii<params->nparams[i];ii++)
+	for (int jj=0;jj<params->nparams[i];jj++) 
+	  if (!isfinite(precon[ii][jj])) {
+	    printf("Have a not-finite element on segment %d on detector %d %d with length %d\n",i,tod->rows[det],tod->cols[det],nelem);
+	    //return;
+	  }
+      params->precon[i]=precon;
+      free(mat[0]);
+      free(mat);
+    }
+  }
+  free(winvec);
+}
+/*--------------------------------------------------------------------------------*/
+void apply_cutfits_precon(mbTOD *tod, actData *params_in, actData *params_out)
+{
+  assert(tod);
+  assert(tod->cuts_fit_params);
+
+#pragma omp parallel for shared(tod,params_in,params_out) default(none) 
+  for (int det=0;det<tod->ndet;det++) {
+    mbCutFitParams *params=tod->cuts_fit_params[tod->rows[det]][tod->cols[det]];
+    for (int i=0;i<params->nregions;i++) {
+      for (int ii=0;ii<params->nparams[i];ii++) 
+	for (int jj=0;jj<params->nparams[i];jj++) 
+	  params_out[params->starting_param[i]+jj]+=params_in[params->starting_param[i]+jj]*params->precon[i][ii][jj];
+    }
+  }
+  
+}
 /*--------------------------------------------------------------------------------*/
 mbUncut ***get_cut_regions_global_index(mbTOD *tod) 
 //make the globally referenced cuts indices, for a 1-d array for gapfilling.
@@ -641,6 +763,121 @@ mbUncut ***get_cut_regions(mbTOD *tod)
   return mat;
 }
 /*--------------------------------------------------------------------------------*/
+mbCutFitParams ***setup_cut_fit_params(mbTOD *tod, int *nparams_from_length)
+//nparams_from_length contains the mapping from cut length to # of polynomial parameters
+{
+  assert(tod);
+  assert(tod->cuts_as_uncuts);
+
+  mbCutFitParams **vec=(mbCutFitParams **)malloc_retry(sizeof(mbCutFitParams *)*tod->nrow*tod->ncol);
+  mbCutFitParams ***mat=(mbCutFitParams ***)malloc_retry(sizeof(mbCutFitParams **)*tod->nrow);
+  memset(vec,0,sizeof(mbCutFitParams **)*tod->nrow*tod->ncol);
+
+  for (int i=0;i<tod->nrow;i++)
+    mat[i]=vec+i*tod->ncol;
+
+  int global_accum=0;
+#if 0
+  for (int i=0;i<tod->nrow;i++)
+    for (int j=0;j<tod->ncol;j++) {
+      //printf("working on detector %d %d\n",i,j);                                                                                                                                           
+      if (tod->cuts_as_uncuts[i][j]==NULL)
+        printf("cuts_as_uncuts is null.\n");
+      mat[i][j]=(mbCutFitParams *)malloc_retry(sizeof(mbCutFitParams));
+      mat[i][j]->nregions=tod->cuts_as_uncuts[i][j]->nregions;
+      mat[i][j]->starting_param=(int *)malloc(mat[i][j]->nregions*sizeof(int));
+      mat[i][j]->nparams=(int *)malloc(mat[i][j]->nregions*sizeof(int));
+      for (int k=0;k<tod->cuts_as_uncuts[i][j]->nregions;k++) {
+	mat[i][j]->nparams[k]=nparams_from_length[tod->cuts_as_uncuts[i][j]->indexLast[k]-tod->cuts_as_uncuts[i][j]->indexFirst[k]];
+	mat[i][j]->starting_param[k]=global_accum;
+	global_accum+=mat[i][j]->nparams[k];
+      }
+    }
+#else
+  for (int det=0;det<tod->ndet;det++) {
+    int i=tod->rows[det];
+    int j=tod->cols[det];
+    //printf("working on %4d %2d %2d with accum %8d\n",det,i,j,global_accum);
+    if (tod->cuts_as_uncuts[i][j]==NULL)
+      printf("cuts_as_uncuts is null.\n");
+    mat[i][j]=(mbCutFitParams *)malloc_retry(sizeof(mbCutFitParams));
+    mat[i][j]->nregions=tod->cuts_as_uncuts[i][j]->nregions;
+    mat[i][j]->starting_param=(int *)malloc(mat[i][j]->nregions*sizeof(int));
+    mat[i][j]->nparams=(int *)malloc(mat[i][j]->nregions*sizeof(int));
+    for (int k=0;k<tod->cuts_as_uncuts[i][j]->nregions;k++) {
+      int cutlen=tod->cuts_as_uncuts[i][j]->indexLast[k]-tod->cuts_as_uncuts[i][j]->indexFirst[k];
+      //printf("cutlen is %5d, nparams is %d\n",cutlen,nparams_from_length[cutlen]);
+      mat[i][j]->nparams[k]=nparams_from_length[tod->cuts_as_uncuts[i][j]->indexLast[k]-tod->cuts_as_uncuts[i][j]->indexFirst[k]];
+      mat[i][j]->starting_param[k]=global_accum;
+      global_accum+=mat[i][j]->nparams[k];
+    }
+  }
+  
+#endif
+  return mat;
+  
+}
+/*--------------------------------------------------------------------------------*/
+int cutpolys2tod(mbTOD *tod,actData *cutvec)
+{
+  if (!tod->have_data) {
+    fprintf(stderr,"missing data in tod in cutvec2tod\n");
+    return 1;
+  }
+  if (tod->cuts_as_vec==NULL) {
+    fprintf(stderr,"Error, tod does not contain cuts_as_vec in cutpolys2tod.\n");
+    return 1;
+  }
+  if (tod->cuts_as_uncuts==NULL) {
+    fprintf(stderr,"Error, tod does not contain cuts_as_uncut in cutpolys2tod.\n");
+    return 1;    
+  }
+  if (tod->cuts_fit_params==NULL) {
+    fprintf(stderr,"Error - tod does not contain cut fit parameters in cutpolys2tod.\n");
+    return 1;
+  }
+#pragma omp parallel for shared(tod,cutvec) default(none)
+  for (int det=0;det<tod->ndet;det++) {
+    mbCutFitParams *params=tod->cuts_fit_params[tod->rows[det]][tod->cols[det]];
+    mbUncut *cut=tod->cuts_as_uncuts[tod->rows[det]][tod->cols[det]];
+    for (int i=0;i<params->nregions;i++) {
+      legendre_eval(tod->data[det]+cut->indexFirst[i],cut->indexLast[i]-cut->indexFirst[i],cutvec+params->starting_param[i],params->nparams[i]);
+    }
+  }
+  
+  return 0;
+}
+/*--------------------------------------------------------------------------------*/
+int tod2cutpolys(mbTOD *tod,actData *cutvec)
+{
+  if (!tod->have_data) {
+    fprintf(stderr,"missing data in tod in cutvec2tod\n");
+    return 1;
+  }
+  if (tod->cuts_as_vec==NULL) {
+    fprintf(stderr,"Error, tod does not contain cuts_as_vec in cutpolys2tod.\n");
+    return 1;
+  }
+  if (tod->cuts_as_uncuts==NULL) {
+    fprintf(stderr,"Error, tod does not contain cuts_as_uncut in cutpolys2tod.\n");
+    return 1;    
+  }
+  if (tod->cuts_fit_params==NULL) {
+    fprintf(stderr,"Error - tod does not contain cut fit parameters in cutpolys2tod.\n");
+    return 1;
+  }
+#pragma omp parallel for shared(tod,cutvec) default(none)
+  for (int det=0;det<tod->ndet;det++) {
+    mbCutFitParams *params=tod->cuts_fit_params[tod->rows[det]][tod->cols[det]];
+    mbUncut *cut=tod->cuts_as_uncuts[tod->rows[det]][tod->cols[det]];
+    for (int i=0;i<params->nregions;i++) {
+      legendre_project(tod->data[det]+cut->indexFirst[i],cut->indexLast[i]-cut->indexFirst[i],cutvec+params->starting_param[i],params->nparams[i]);
+    }
+  }
+  
+  return 0;
+}
+/*--------------------------------------------------------------------------------*/
 mbUncut ***get_uncut_regions(mbTOD *tod) 
 //calculate the uncut regions and return a matrix to 'em.
 {
@@ -748,7 +985,10 @@ void fill_gaps_stupid(mbTOD *tod)
   }
 #pragma omp parallel for shared(tod) default(none)
   for (int det=0;det<tod->ndet;det++) {
-    mbUncut *uncut=tod->uncuts[tod->rows[det]][tod->cols[det]];
+    mbUncut *uncut;
+    uncut=tod->uncuts[tod->rows[det]][tod->cols[det]];
+    if (tod->uncuts_for_interp)
+      uncut=tod->uncuts_for_interp[tod->rows[det]][tod->cols[det]];
     int nreg=uncut->nregions;
     if (nreg>0) {
       if (uncut->indexFirst[0]>0)
@@ -1018,6 +1258,67 @@ MAP *make_blank_map_copy(const MAP *map)
   //memcpy(map_copy->map,map->map,sizeof(actData)*map_copy->npix);
   clear_map(map_copy);
   return map_copy;
+}
+
+/*--------------------------------------------------------------------------------*/
+MAP *deres_map(MAP *map)
+{
+  MAP *map_copy;
+  map_copy=(MAP *)malloc_retry(sizeof(MAP));
+  
+  assert(map->projection->proj_type!=NK_HEALPIX_RING);  //if healpix, have to handle things a bit differently
+  assert(map->projection->proj_type!=NK_HEALPIX_NEST);
+  map_copy->pixsize=map->pixsize*2;
+  map_copy->ramin=map->ramin;
+  map_copy->ramax=map->ramax;
+  map_copy->decmin=map->decmin;
+  map_copy->decmax=map->decmax;
+  map_copy->nx=map->nx/2;
+  map_copy->ny=map->ny/2;
+  map_copy->npix=map_copy->nx*map_copy->ny;
+  //map_copy->projection=(nkProjection *)malloc_retry(sizeof(nkProjection));
+  //memcpy(map_copy->projection,map->projection,sizeof(nkProjection));
+  map_copy->projection=deres_projection(map->projection);
+  map_copy->have_locks=0;  //don't recycle locks.  will create them as needed, if needed.
+  map_copy->map=(actData *)malloc_retry(sizeof(actData)*map_copy->npix);
+  //memcpy(map_copy->map,map->map,sizeof(actData)*map_copy->npix);
+  
+  memset(map_copy->map,0,sizeof(actData)*map_copy->npix);
+  for (int i=0;i<map_copy->ny*2;i++) 
+    for (int j=0;j<map_copy->nx*2;j++)
+      map_copy->map[(i/2)*map_copy->nx+(j/2)]+=map->map[i*map->nx+j];
+  
+  return map_copy;
+  
+}
+/*--------------------------------------------------------------------------------*/
+MAP *upres_map(MAP *map)
+{
+  MAP *map_copy;
+  map_copy=(MAP *)malloc_retry(sizeof(MAP));
+  
+  assert(map->projection->proj_type!=NK_HEALPIX_RING);  //if healpix, have to handle things a bit differently
+  assert(map->projection->proj_type!=NK_HEALPIX_NEST);
+  map_copy->pixsize=map->pixsize/2;
+  map_copy->ramin=map->ramin;
+  map_copy->ramax=map->ramax;
+  map_copy->decmin=map->decmin;
+  map_copy->decmax=map->decmax;
+  map_copy->nx=map->nx*2;
+  map_copy->ny=map->ny*2;
+  map_copy->npix=map_copy->nx*map_copy->ny;
+  //map_copy->projection=(nkProjection *)malloc_retry(sizeof(nkProjection));
+  //memcpy(map_copy->projection,map->projection,sizeof(nkProjection));
+  map_copy->projection=upres_projection(map->projection);
+  map_copy->have_locks=0;  //don't recycle locks.  will create them as needed, if needed.
+  map_copy->map=(actData *)malloc_retry(sizeof(actData)*map_copy->npix);
+  //memcpy(map_copy->map,map->map,sizeof(actData)*map_copy->npix);
+  for (int i=0;i<map_copy->ny;i++) 
+    for (int j=0;j<map_copy->nx;j++)
+      map_copy->map[i*map_copy->nx+j]=map->map[(i/2)*map->nx+(j/2)];
+  
+  return map_copy;
+  
 }
 /*--------------------------------------------------------------------------------*/
 
@@ -1726,6 +2027,10 @@ void calculate_avec(mbTOD *tod, int mydet, actData *avec)
 /*--------------------------------------------------------------------------------*/
 int cutvec2tod(mbTOD *tod, actData *cutvec)
 {
+  if (tod->cuts_fit_params) {
+    //if cuts are paramaterized by polynomials instead of full cutvecs, behave properly.
+    return cutpolys2tod(tod,cutvec);
+  }
   if (!tod->have_data) {
     fprintf(stderr,"missing data in tod in cutvec2tod\n");
     return 1;
@@ -1756,6 +2061,11 @@ int cutvec2tod(mbTOD *tod, actData *cutvec)
 /*--------------------------------------------------------------------------------*/
 int tod2cutvec(mbTOD *tod, actData *cutvec)
 {
+
+  if (tod->cuts_fit_params) {
+    //if cuts are paramaterized by polynomials instead of full cutvecs, behave properly.
+    return tod2cutpolys(tod,cutvec);
+  }
   //printf("greetings from tod2cutvec.\n");
   if (!tod->have_data) {
     fprintf(stderr,"missing data in tod in tod2cutvec\n");

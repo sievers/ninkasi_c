@@ -198,6 +198,8 @@ actData tod_times_map(const MAP *map, const mbTOD *tod, PARAMS *params);
 
 int read_tod_data(mbTOD *tod);
 MAP *make_map_copy(MAP *map);
+MAP *deres_map(MAP *map);
+MAP *upres_map(MAP *map);
 
 actData map_times_map(MAP *x, MAP *y);
 void map_axpy(MAP *y, MAP *x, actData a);
@@ -206,6 +208,11 @@ void purge_cut_detectors(mbTOD *tod);
 mbUncut ***get_uncut_regions(mbTOD *tod);
 int get_numel_cut(mbTOD *tod);
 void set_global_indexed_cuts(mbTOD *tod);
+mbCutFitParams ***setup_cut_fit_params(mbTOD *tod, int *nparams_from_length);
+void setup_cutsfits_precon(mbTOD *tod);
+void apply_cutfits_precon(mbTOD *tod, actData *params_in, actData *params_out);
+
+
 mbUncut ***get_cut_regions(mbTOD *tod);
 void get_tod_cut_regions(mbTOD *tod);
 mbUncut ***get_cut_regions_global_index(mbTOD *tod);

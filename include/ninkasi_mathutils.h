@@ -54,7 +54,10 @@ actData myrand(unsigned *seed);
 void act_gemm(char transa, char transb, int m, int n, int k, actData alpha, actData *a, int lda, actData *b, int ldb, actData beta, actData *c, int ldc);
 
 actData *legendre_fit(actData *data, int ndata, int ord);
+actData **legendre_mat(int ndata, int ord);
 void legendre_eval(actData *data, int ndata, actData *fitp, int ord);
+void legendre_project(actData *data, int ndata, actData *fitp, int ord);
+
 
 
 /*--------------------------------------------------------------------------------*/

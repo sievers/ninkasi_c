@@ -515,3 +515,51 @@ int set_map_projection_cea_predef( MAP *map,actData radelt, actData decdelt, act
   
   return 0;
 }
+/*--------------------------------------------------------------------------------*/
+nkProjection *deres_projection(nkProjection *proj)
+{
+  nkProjection *proj2=(nkProjection *)malloc(sizeof(nkProjection));
+  switch(proj->proj_type) {
+  case(NK_CEA):
+    proj2->proj_type=proj->proj_type;
+    proj2->radelt=proj->radelt*2;
+    proj2->decdelt=proj->decdelt*2;
+    proj2->ra_cent=proj->ra_cent;
+    proj2->dec_cent=proj->dec_cent;
+    proj2->rapix=proj->rapix/2+0.25;
+    proj2->decpix=proj->decpix/2+0.25;
+;
+    proj2->pv=proj->pv;
+    return proj2;
+    break;
+  default:
+    printf("Unsupported type in deres_projection.\n");
+    assert(1==0);
+    break;
+  }
+  return NULL;
+}
+
+/*--------------------------------------------------------------------------------*/
+nkProjection *upres_projection(nkProjection *proj)
+{
+  nkProjection *proj2=(nkProjection *)malloc(sizeof(nkProjection));
+  switch(proj->proj_type) {
+  case(NK_CEA):
+    proj2->proj_type=proj->proj_type;
+    proj2->radelt=proj->radelt/2;
+    proj2->decdelt=proj->decdelt/2;
+    proj2->ra_cent=proj->ra_cent;
+    proj2->dec_cent=proj->dec_cent;
+    proj2->rapix=proj->rapix*2-0.5;
+    proj2->decpix=proj->decpix*2-0.5;
+    proj2->pv=proj->pv;
+    return proj2;
+    break;
+  default:
+    printf("Unsupported type in deres_projection.\n");
+    assert(1==0);
+    break;
+  }
+  return NULL;
+}

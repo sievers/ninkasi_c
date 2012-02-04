@@ -52,7 +52,6 @@ void radec2xy_tan(actData *x, actData *y,actData ra, actData dec, nkProjection *
 
 int set_map_projection_healpix_ring(MAP *map, int nside);
 int set_map_projection_healpix_nest(MAP *map, int nside);
-
-
-
+nkProjection *deres_projection(nkProjection *proj);
+nkProjection *upres_projection(nkProjection *proj);
 #endif

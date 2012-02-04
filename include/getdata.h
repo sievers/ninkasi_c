@@ -63,13 +63,6 @@ int GetNFrames(const struct FormatType *F, int *error_code, const char *field);
 
 /***************************************************************************/
 /*                                                                         */
-/*    Get the number of samples available                                  */
-/*                                                                         */
-/***************************************************************************/
-int GetNSamples(const struct FormatType *F, int *error_code, const char *field);
-
-/***************************************************************************/
-/*                                                                         */
 /*    Get the number format structure                                      */
 /*                                                                         */
 /***************************************************************************/

@@ -1,29 +1,43 @@
 
 #pragma once
 
-#include "mbTOD.h"
+#include <stdbool.h>
+#include <stdint.h>
 
+struct FormatType;
 
-void *dirfile_read_channel_direct(char typechar, const char *filename, const char *channelname, int *nsamples_out);
+bool
+dirfile_has_channel( const struct FormatType *F, const char *channel );
 
+void *
+dirfile_read_channel( char typechar, const struct FormatType *F,
+        const char *channelname, int *nsamples_out );
 
-void read_dirfile_tod_data (mbTOD *tod);
-actData **read_dirfile_tod_data_from_rowcol_list (mbTOD *tod, int *row, int *col, int ndet, actData **data);
+int16_t *
+dirfile_read_int16_channel( const struct FormatType *F,
+        const char *channelname, int *nsamples );
 
-mbTOD *
-read_dirfile_tod_header( const char *filename );
+uint16_t *
+dirfile_read_uint16_channel( const struct FormatType *F,
+        const char *channelname, int *nsamples );
 
+int32_t *
+dirfile_read_int32_channel( const struct FormatType *F,
+        const char *channelname, int *nsamples );
 
-int
-dirfile_create( const char *dirfilename );
+uint32_t *
+dirfile_read_uint32_channel( const struct FormatType *F,
+        const char *channelname, int *nsamples );
 
-int
-dirfile_write_raw_channel( const char *dirfilename,
-        const char *channelname, size_t samples_per_frame,
-        size_t nframes, char typechar, const void *data );
+float *
+dirfile_read_float_channel( const struct FormatType *F,
+        const char *channelname, int *nsamples );
 
-mbTOD *
-read_dirfile_tod( const char *filename );
+double *
+dirfile_read_double_channel( const struct FormatType *F,
+        const char *channelname, int *nsamples );
 
-mbTOD *
-read_dirfile_tod_header_decimate( const char *filename , int decimate );
+uint32_t
+dirfile_read_uint32_sample( const struct FormatType *F,
+        const char *channelname, int index );
+

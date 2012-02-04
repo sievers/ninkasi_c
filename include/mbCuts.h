@@ -46,6 +46,15 @@ typedef struct
 }
 mbUncut;
 
+typedef struct
+{
+  int nregions;
+  int *nparams;
+  int *starting_param;
+  actData ***precon;
+}
+mbCutFitParams;
+
 /// Represents all cuts for a time-ordered-data set.
 /// All cuts includes both global and detector-specific cuts.
 /// To be useful, it should be associated with a TOD.

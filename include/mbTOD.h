@@ -160,7 +160,10 @@ typedef struct {
   double lon;          //!< longitude of observations
   mbCuts *cuts; //!< cuts that apply to this TOD
   mbUncut ***uncuts;  //!< uncut regions
+  mbUncut ***uncuts_for_interp;  //!< uncut regions
   mbUncut ***cuts_as_uncuts;  //!< cut regions stored using uncuts
+  mbCutFitParams ***cuts_fit_params;  //legendre polynomial coefficients for gapfilling across the cuts
+  
   mbUncut ***cuts_as_vec;  //!< vectorized cut regions for indexing into a global array
   mbUncut ***kept_data; //have a second copy of uncuts in case we wish to project/gapfill different data
   actData **ends;        //!< values at beginning and end of TOD for detrend/retrend

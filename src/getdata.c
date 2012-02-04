@@ -21,8 +21,7 @@
 #include <math.h>
 
 #include <slimlib.h>
-//#include <zzip/zzip.h>
-#include <zzip/lib.h>
+#include <zzip/zzip.h>
 
 #include "getdata.h"
 
@@ -237,7 +236,7 @@ read_lines_from_buffer( char *buf, size_t *nlines )
   return lines;
 }
 
-bool
+static bool
 file_exists( const char *filename )
 {
   ZZIP_FILE *fp = zzip_fopen( filename, "r" );
@@ -246,10 +245,10 @@ file_exists( const char *filename )
   return true;
 }
 
-size_t
-ffile_size( const char *filename )
+static size_t
+file_size( const char *filename )
 {
-  //printf( "ffile_size: %s\n", filename );
+  //printf( "file_size: %s\n", filename );
     ZZIP_FILE *fp = zzip_fopen( filename, "r" );
     assert( fp != NULL ); 
     ZZIP_STAT stat;
@@ -340,6 +339,7 @@ static void ParseRaw(char in_cols[MAX_IN_COLS][MAX_LINE_LENGTH],
       R->size = 8;
       break;
     default:
+      printf("bad raw %c\n", in_cols[2][0]);
       *error_code = GD_E_FORMAT;
       return;
   }
@@ -616,6 +616,7 @@ static int ParseFormatFile(ZZIP_FILE* fp, struct FormatType *F, const char* file
 
       /* If opening the file failed, set the error code and abort parsing. */
       if (new_fp == NULL) {
+	printf("%s\n", format_file);
         error_code = GD_E_OPEN_INCLUDE;
         break;
       }
@@ -636,8 +637,10 @@ static int ParseFormatFile(ZZIP_FILE* fp, struct FormatType *F, const char* file
       error_code = ParseFormatFile(new_fp, F, filedir, new_subdir, linterp_prefix,
           IncludeList, i_include);
       zzip_fclose(new_fp);
-    } else
+    } else {
+      printf("bad format a: %s %s\n", in_cols[0], in_cols[1]);
       error_code = GD_E_FORMAT;
+    }
 
     /* break out of loop (so we can return) if we've encountered an error */
     if (error_code != GD_E_OK)
@@ -680,6 +683,7 @@ struct FormatType *GetFormat(const char *filedir, const char *linterp_prefix, in
   snprintf(format_file, MAX_FILENAME_LENGTH+6, "%s/format", filedir);
   fp = zzip_fopen(format_file, "r");
   if (fp == NULL) {
+    printf("%s\n", format_file);
     *error_code = GD_E_OPEN_FORMAT;
     return (NULL);
   }
@@ -1175,6 +1179,7 @@ static int GetSPF(int recurse_level, const char *field_code, const struct Format
     return(spf);
   }
 
+  //printf("field_code = %s\n", field_code);
   *error_code = GD_E_BAD_CODE;
   return(0);
 }
@@ -2063,52 +2068,12 @@ int GetNFrames(const struct FormatType *F, int *error_code, const char *in_field
       return(0);
   } else
   {
-    st_size = ffile_size( raw_data_filename );
+    st_size = file_size( raw_data_filename );
   }
 
   nf = st_size/
     (F->first_field.size*F->first_field.samples_per_frame);
   nf += F->frame_offset;
-
-  return(nf);
-}
-
-/***************************************************************************/
-/*                                                                         */
-/*    Get the number of samples available                                  */
-/*                                                                         */
-/***************************************************************************/
-int GetNSamples(const struct FormatType *F, int *error_code, const char *in_field) {
-  char raw_data_filename[2 * MAX_FILENAME_LENGTH + FIELD_LENGTH + 2];
-  //struct stat statbuf;
-  long st_size;
-  int nf;
-
-
-  *error_code = GD_E_OK;
-
-  if (!F || F->n_raw==0) {
-    *error_code = GD_E_FORMAT;
-    return(0);
-  }
-
-  /* load the first valid raw field, either as a regular or a slim file */
-  snprintf(raw_data_filename, 2 * MAX_FILENAME_LENGTH + FIELD_LENGTH + 2,
-	   "%s/%s", F->FileDirName, F->first_field.file);
-  //if (stat(raw_data_filename, &statbuf) < 0) {
-  if ( !file_exists(raw_data_filename) ) {
-    snprintf(raw_data_filename, 2 * MAX_FILENAME_LENGTH + FIELD_LENGTH + 2,
-             "%s/%s.slm", F->FileDirName, F->first_field.file);
-    st_size = slimrawsize(raw_data_filename);
-    if (st_size < 0)
-      return(0);
-  } else
-  {
-    st_size = ffile_size( raw_data_filename );
-  }
-
-  nf = st_size/F->first_field.size
-     + F->frame_offset*F->first_field.samples_per_frame;
 
   return(nf);
 }

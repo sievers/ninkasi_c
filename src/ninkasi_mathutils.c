@@ -564,7 +564,7 @@ static inline actData legendre_x(int i, int ndata)
   return 2*dx-1;
 }
 /*--------------------------------------------------------------------------------*/
-actData *legendre_fit(actData *data, int ndata, int ord)
+actData **legendre_mat(int ndata, int ord)
 {
   actData **vecs=matrix(ord,ndata);
   for (int i=0;i<ndata;i++) {
@@ -575,6 +575,24 @@ actData *legendre_fit(actData *data, int ndata, int ord)
     for (int j=1;j<ord-1;j++)
       vecs[j+1][i]=((2*j+1)*x*vecs[j][i]-j*vecs[j-1][i])/(1+(actData)j);
   }
+  return vecs;
+}
+/*--------------------------------------------------------------------------------*/
+actData *legendre_fit(actData *data, int ndata, int ord)
+{
+#if 1
+  actData **vecs=legendre_mat(ndata,ord);
+#else
+  actData **vecs=matrix(ord,ndata);
+  for (int i=0;i<ndata;i++) {
+    actData x=legendre_x(i,ndata);
+    vecs[0][i]=1;
+    if (ord>1)
+      vecs[1][i]=x;
+    for (int j=1;j<ord-1;j++)
+      vecs[j+1][i]=((2*j+1)*x*vecs[j][i]-j*vecs[j-1][i])/(1+(actData)j);
+  }
+#endif
   actData *fitp=linfit(data,vecs,NULL,ndata,ord);
   free(vecs[0]);
   free(vecs);
@@ -603,6 +621,39 @@ void legendre_eval(actData *data, int ndata, actData *fitp, int ord)
     for (int j=1;j<ord-1;j++) {
       pnext=((2*j+1)*x*pcur-j*pold)/((actData)j+1);
       data[i]+=pnext*fitp[j+1];
+      pold=pcur;
+      pcur=pnext;
+    }
+  }
+  return;
+}
+/*--------------------------------------------------------------------------------*/
+void legendre_project(actData *data, int ndata, actData *fitp, int ord)
+{
+  if (ord<=1) {
+    for (int i=0;i<ndata;i++)
+      fitp[0]+=data[i];
+    return;
+  }
+  if (ord==2) {
+    for (int i=0;i<ndata;i++) {
+      fitp[0]+=data[i];
+      fitp[1]+=data[i]*legendre_x(i,ndata);
+    }
+    return;
+  }
+  for (int i=0;i<ndata;i++) {
+    actData tot=fitp[0];
+    actData x=legendre_x(i,ndata);
+    actData pold=1;
+    actData pcur=x;
+    actData pnext;
+    fitp[0]+=data[i];
+    fitp[1]+=data[i]*legendre_x(i,ndata);
+
+    for (int j=1;j<ord-1;j++) {
+      pnext=((2*j+1)*x*pcur-j*pold)/((actData)j+1);
+      fitp[j+1]+=data[i]*pnext;
       pold=pcur;
       pcur=pnext;
     }

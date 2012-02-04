@@ -75,9 +75,10 @@ am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 libninkasi_la_LIBADD =
 am_libninkasi_la_OBJECTS = astro.lo clapack.lo common_mode.lo \
-	dirfile.lo getdata.lo iers_bulletin_a.lo mbCuts.lo ninkasi.lo \
-	ninkasi_noise.lo ninkasi_tod.lo parse_strings.lo ps_stuff.lo \
-	ninkasi_pointing.lo ninkasi_projection.lo ninkasi_mathutils.lo
+	dirfile.lo readtod.lo getdata.lo iers_bulletin_a.lo mbCuts.lo \
+	ninkasi.lo ninkasi_noise.lo ninkasi_tod.lo parse_strings.lo \
+	ps_stuff.lo ninkasi_pointing.lo ninkasi_projection.lo \
+	ninkasi_mathutils.lo
 libninkasi_la_OBJECTS = $(am_libninkasi_la_OBJECTS)
 PROGRAMS = $(bin_PROGRAMS)
 am_ninkasi_OBJECTS = ninkasi_main.$(OBJEXT)
@@ -239,6 +240,7 @@ libninkasi_la_SOURCES = astro.c \
 	clapack.c \
 	common_mode.c \
 	dirfile.c \
+	readtod.c \
 	getdata.c \
 	iers_bulletin_a.c \
 	mbCuts.c \
@@ -394,6 +396,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ninkasi_tod.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/parse_strings.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ps_stuff.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/readtod.Plo@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
