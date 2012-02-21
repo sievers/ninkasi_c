@@ -6,6 +6,11 @@
 
 #include <ninkasi_defs.h>
 //#include <ninkasi.h>
+#ifdef ACTPOL
+#include <actpol/actpol.h>
+#endif
+
+
 #include <ps_stuff.h>
 #include <mbCuts.h>
 #include "noise_types.h"
@@ -69,6 +74,29 @@ typedef struct {
   int nclock;
 
 } TiledPointingFit;
+/*--------------------------------------------------------------------------------*/
+#ifdef ACTPOL
+typedef struct {
+  int nhorn;
+  actData *dx;
+  actData *dy;
+  ACTpolArray *array;
+  actData alt0;
+  actData az0;
+  actData az_throw;
+  ACTpolWeather weather;
+  int *ipiv;
+  int npiv;
+  int dpiv;
+
+
+  actData **ra_piv;
+  actData **dec_piv;
+  actData **sin2gamma_piv;
+  actData **cos2gamma_piv;
+
+} ACTpolPointingFit;
+#endif
 
 /*--------------------------------------------------------------------------------*/
 
@@ -201,6 +229,13 @@ typedef struct {
   actData *dra;
   actData *ddec;  
   
+#ifdef ACTPOL
+  //ACTpolArray *polarray;
+  //ACTpolWeather weather;  //if there's TOD-based weather info.
+  ACTpolPointingFit *actpol_pointing;
+  actData *hpw;
+#endif
+
   PointingFit *pointing_fit;  //pointing fit, turn alt/az into ra/dec
   int **pixelization_saved;  //save a map pixelization in here.  Will break if there are multiple classes of maps with different pixelizations.
   actData **ra_saved;

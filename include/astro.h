@@ -7,10 +7,11 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-static inline double secs2days( double s ) { return s/86400.; }
-static inline double deg2rad( double deg ) { return deg*M_PI/180.; }
-static inline double rad2deg( double rad ) { return rad*180./M_PI; }
-static inline double arcsec2rad( double sec ) { return deg2rad(sec/3600.); }
+static inline double mysecs2days( double s ) { return s/86400.; }
+static inline double mydeg2rad( double deg ) { return deg*M_PI/180.; }
+static inline double myrad2deg( double rad ) { return rad*180./M_PI; }
+static inline double myarcsec2rad( double sec ) { return mydeg2rad(sec/3600.); }
+
 
 typedef struct
 {

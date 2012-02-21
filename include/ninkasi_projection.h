@@ -33,6 +33,7 @@ typedef struct {
 #endif
 #include "ninkasi_types.h"
 
+void radecvec2cea_pix(actData *ra, actData *dec, int *rapix, int *decpix, int *ind, int ndata, const MAP *map);
 void get_map_projection(const mbTOD *tod, const MAP *map, int det, int *ind, PointingFitScratch *scratch);
 void get_map_projection_wchecks(const mbTOD *tod, const MAP *map, int det, int *ind, PointingFitScratch *scratch, bool *inbounds);
 int set_map_projection_cea_simple( MAP *map);
@@ -54,4 +55,5 @@ int set_map_projection_healpix_ring(MAP *map, int nside);
 int set_map_projection_healpix_nest(MAP *map, int nside);
 nkProjection *deres_projection(nkProjection *proj);
 nkProjection *upres_projection(nkProjection *proj);
+
 #endif

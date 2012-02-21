@@ -15,13 +15,13 @@
 double
 convert_ctime_to_utc_mjd( double ctime )
 {
-    return secs2days(ctime) + 40587.0;
+    return mysecs2days(ctime) + 40587.0;
 }
 
 double
 convert_utc_to_tt( double utc )
 {
-    return utc + secs2days(slaDtt(utc));
+    return utc + mysecs2days(slaDtt(utc));
 }
 
 /*--------------------------------------------------------------------------------*/
@@ -55,8 +55,8 @@ observed_altaz_to_mean_radec( const Site *site, double freq_ghz,
             site->east_longitude,
             site->latitude,
             site->elevation_m,
-            arcsec2rad(x),
-            arcsec2rad(y),
+            myarcsec2rad(x),
+            myarcsec2rad(y),
             site->temperature_K,
             site->pressure_mb,
             site->relative_humidity,
@@ -124,8 +124,8 @@ dobserved_altaz_to_mean_radec( const Site *site, double freq_ghz,
             site->east_longitude,
             site->latitude,
             site->elevation_m,
-            arcsec2rad(x),
-            arcsec2rad(y),
+	    myarcsec2rad(x),
+            myarcsec2rad(y),
             site->temperature_K,
             site->pressure_mb,
             site->relative_humidity,

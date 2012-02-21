@@ -17,6 +17,10 @@
 #include <mpi.h>
 #endif
 
+#ifdef ACTPOL
+#include <actpol/actpol.h>
+#endif
+
 //#define OLD_POINTING_OFFSET
 
 #define BAD_POINTING 100
@@ -30,8 +34,8 @@
 void
 ACTSite( Site *p )
 {
-  p->latitude = deg2rad(-22.9585);
-  p->east_longitude = deg2rad(-67.7876);
+  p->latitude = mydeg2rad(-22.9585);
+  p->east_longitude = mydeg2rad(-67.7876);
   p->elevation_m = 5188.;
   p->temperature_K = 273.;
   p->pressure_mb = 550.;
@@ -609,6 +613,11 @@ PointingFitScratch *allocate_pointing_fit_scratch(const mbTOD *tod)
   scratch->az=vector(tod->ndata);
   scratch->tod_alt=vector(tod->ndata);
   scratch->tod_az=vector(tod->ndata);
+#ifdef ACTPOL
+  scratch->sin2gamma=vector(tod->ndata);
+  scratch->cos2gamma=vector(tod->ndata);
+#endif
+
 
   if (tod->az) {  //breaks if the pointing model is saved.
     assert(tod->az);  
@@ -629,6 +638,10 @@ PointingFitScratch *allocate_pointing_fit_scratch(const mbTOD *tod)
       scratch->ra_coarse=vector(scratch->pointing_fit->ncoarse);
       scratch->dec_coarse=vector(scratch->pointing_fit->ncoarse);
       scratch->time_coarse=vector(scratch->pointing_fit->ncoarse);
+#ifdef ACTPOL
+      scratch->sin2gamma_coarse=vector(scratch->pointing_fit->ncoarse);
+      scratch->cos2gamma_coarse=vector(scratch->pointing_fit->ncoarse);
+#endif
     }
 
   
@@ -645,6 +658,10 @@ void destroy_pointing_fit_scratch(PointingFitScratch *scratch)
   free(scratch->az);
   free(scratch->tod_alt);
   free(scratch->tod_az);
+#ifdef ACTPOL
+  free(scratch->sin2gamma);
+  free(scratch->cos2gamma);
+#endif
   if (scratch->pointing_fit)
     if (scratch->pointing_fit->ncoarse) {
       free(scratch->ra_coarse);
@@ -652,6 +669,11 @@ void destroy_pointing_fit_scratch(PointingFitScratch *scratch)
       free(scratch->alt_coarse);
       free(scratch->az_coarse);
       free(scratch->time_coarse);
+#ifdef ACTPOL
+      free(scratch->sin2gamma_coarse);
+      free(scratch->cos2gamma_coarse);
+#endif
+
     }
   
   if (scratch->pointing_fit)
@@ -1262,3 +1284,186 @@ void destroy_pointing_fit(mbTOD *tod)
   tod->pointing_fit=NULL;
 }
 
+/*--------------------------------------------------------------------------------*/
+#ifdef ACTPOL
+ACTpolPointingFit *initialize_actpol_pointing(mbTOD *tod, actData *dx, actData *dy, actData *angle, actData freq,int dpiv)
+{
+  ACTpolPointingFit *fit=(ACTpolPointingFit *)calloc(1,sizeof(ACTpolPointingFit));
+  int nhorns=tod->ndet;
+  ACTpolArray *array = ACTpolArray_alloc(nhorns);
+
+
+  actData xtot=0,ytot=0;
+  for (int i=0;i<nhorns;i++){
+    xtot+=dx[i];
+    ytot+=dy[i];
+  }
+  actData xcent=xtot/((actData)nhorns);
+  actData ycent=ytot/((actData)nhorns);
+  ACTpolArray_init(array, freq, xcent,ycent);
+  for (int i = 0; i < nhorns; i++) {
+    if (angle != NULL)
+      ACTpolFeedhorn_init(array->horn+i, dx[i], dy[i], angle[i]);
+    else
+      ACTpolFeedhorn_init(array->horn+i, dx[i], dy[i],0);
+  }
+  
+  fit->array=array;
+
+  double azmin,azmax,altmin,altmax;
+  azmin=tod->az[0];
+  azmax=tod->az[0];
+  altmin=tod->alt[0];
+  altmax=tod->alt[0];
+  for (int j=1;j<tod->ndata;j++) {
+    if (tod->az[j]<azmin)
+      azmin=tod->az[j];
+    if (tod->az[j]>azmax)
+      azmax=tod->az[j];
+    if (tod->alt[j]<altmin)
+      altmin=tod->alt[j];
+    if (tod->alt[j]>altmax)
+      altmax=tod->alt[j];
+  }
+
+  fit->alt0=0.5*(altmin+altmax);
+  fit->az0=0.5*(azmin+azmax);
+  fit->az_throw=0.5*(azmax-azmin);
+
+
+
+
+  int npiv=tod->ndata/dpiv+1;
+  while ((npiv-1)*dpiv<tod->ndata-1)
+    npiv++;
+  int *ipiv=(int *)malloc(sizeof(int)*npiv);
+  for (int i=0;i<npiv;i++)
+    ipiv[i]=i*dpiv;
+  if (ipiv[npiv-1]>=tod->ndata)
+    ipiv[npiv-1]=tod->ndata-1;
+  //printf("Final pivot is %d %d %d\n",npiv,ipiv[npiv-1],tod->ndata);
+  fit->ipiv=ipiv;
+  fit->npiv=npiv;
+  fit->dpiv=dpiv;
+  
+  ACTpolWeather_default(&(fit->weather));
+
+  tod->actpol_pointing=fit;
+  return fit;
+  
+}
+#endif
+/*--------------------------------------------------------------------------------*/
+#ifdef ACTPOL
+void precalc_actpol_pointing(mbTOD *tod)
+{
+  assert(tod->actpol_pointing);
+  ACTpolPointingFit *fit=tod->actpol_pointing;
+  
+  if (fit->ra_piv==NULL) {
+    fit->ra_piv=matrix(tod->ndet,fit->npiv);
+    fit->dec_piv=matrix(tod->ndet,fit->npiv);
+    fit->sin2gamma_piv=matrix(tod->ndet,fit->npiv);
+    fit->cos2gamma_piv=matrix(tod->ndet,fit->npiv);  
+  }
+  else
+    printf("Skipping allocation.\n");
+  
+
+  
+#pragma omp parallel shared(tod,fit) default(none)
+  {
+    
+    ACTpolScan scan;
+    ACTpolScan_init(&scan, fit->alt0,fit->az0,fit->az_throw);
+    
+    ACTpolArrayCoords *coords = ACTpolArrayCoords_alloc(fit->array);
+    ACTpolArrayCoords_init(coords);
+    ACTpolArrayCoords_update_refraction(coords, &scan, &(fit->weather));
+    
+    ACTpolState *state = ACTpolState_alloc();
+    ACTpolState_init(state);    
+    
+    
+#pragma omp for
+    for (int i=0;i<fit->npiv;i++) {
+      int isamp=i*fit->dpiv;
+      if (isamp>=tod->ndata)
+	isamp=tod->ndata-1;
+      //printf("isamp is %d of %d\n",isamp,tod->ndata);
+      actData myctime=tod->ctime+(isamp)*tod->deltat;      
+      ACTpolState_update(state, myctime, tod->alt[isamp],tod->az[isamp]);
+      ACTpolArrayCoords_update_fast(coords, state);
+      for (int k=0;k<tod->ndet;k++) {
+	
+	ACTpolFeedhornCoords *fc = coords->horn + k;
+	fit->ra_piv[k][i]=fc->ra;
+	fit->dec_piv[k][i]=fc->sindec;
+	fit->sin2gamma_piv[k][i]=fc->sin2gamma;
+	fit->cos2gamma_piv[k][i]=fc->cos2gamma;
+	
+      }            
+    }
+    
+    ACTpolArrayCoords_free(coords);
+    ACTpolState_free(state);
+  }
+}
+#endif 
+/*--------------------------------------------------------------------------------*/
+
+#ifdef ACTPOL
+void precalc_actpol_pointing_free(mbTOD *tod)
+{
+  if (!tod->actpol_pointing) {
+    printf("no actpol_pointing found in precalc_actpol_pointing_free, skipping free.\n");
+    return;
+  }
+  ACTpolPointingFit *fit=tod->actpol_pointing;
+  if (fit->ra_piv) {
+    free(fit->ra_piv[0]);
+    free(fit->ra_piv);
+    fit->ra_piv=NULL;
+  }
+
+  if (fit->dec_piv) {
+    free(fit->dec_piv[0]);
+    free(fit->dec_piv);
+    fit->dec_piv=NULL;
+  }
+
+  if (fit->sin2gamma_piv) {
+    free(fit->sin2gamma_piv[0]);
+    free(fit->sin2gamma_piv);
+    fit->sin2gamma_piv=NULL;
+  }
+
+
+  if (fit->cos2gamma_piv) {
+    free(fit->cos2gamma_piv[0]);
+    free(fit->cos2gamma_piv);
+    fit->cos2gamma_piv=NULL;
+  }
+  return;
+}
+#endif
+/*--------------------------------------------------------------------------------*/
+#ifdef ACTPOL
+void get_radec_one_det_actpol(mbTOD *tod,int det,PointingFitScratch *scratch)
+{
+  ACTpolPointingFit *fit=tod->actpol_pointing;
+  for (int seg=0;seg<fit->npiv-1;seg++) {
+    //printf("seg is %d %d %d\n",seg,fit->ipiv[seg],fit->ipiv[seg+1]);
+    for (int i=fit->ipiv[seg];i<fit->ipiv[seg+1];i++) {
+      scratch->ra[i]=fit->ra_piv[det][seg]+(fit->ra_piv[det][seg+1]-fit->ra_piv[det][seg])*(i-fit->ipiv[seg])/((actData)(fit->ipiv[seg+1]-fit->ipiv[seg]));
+      scratch->dec[i]=fit->dec_piv[det][seg]+(fit->dec_piv[det][seg+1]-fit->dec_piv[det][seg])*(i-fit->ipiv[seg])/((actData)(fit->ipiv[seg+1]-fit->ipiv[seg]));
+      //scratch->ra[0]=fit->ra_piv[det][seg]+(fit->ra_piv[det][seg+1]-fit->ra_piv[det][seg])*(i-fit->ipiv[seg])/((actData)(fit->ipiv[seg+1]-fit->ipiv[seg]));
+      //scratch->dec[0]=fit->dec_piv[det][seg]+(fit->dec_piv[det][seg+1]-fit->dec_piv[det][seg])*(i-fit->ipiv[seg])/((actData)(fit->ipiv[seg+1]-fit->ipiv[seg]));
+    }
+  }
+  scratch->ra[tod->ndata-1]=fit->ra_piv[det][fit->npiv-1];
+  scratch->dec[tod->ndata-1]=fit->dec_piv[det][fit->npiv-1];
+}
+
+#endif
+/*--------------------------------------------------------------------------------*/

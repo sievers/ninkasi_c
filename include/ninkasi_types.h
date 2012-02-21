@@ -61,6 +61,10 @@ struct map_struct_s {
   actData *map;
   int nx,ny;
   long npix;
+#ifdef ACTPOL
+  int pol_state;  //flag to tell me how many polarizations I have.  0/1=I, 2=Q+U, 3=I+Q+U
+#endif
+
 
   //Stuff for reductions
   int have_locks;
@@ -79,6 +83,6 @@ struct mapvec_struct_s {
   MAP **maps;
 } mapvec_struct;
 typedef struct mapvec_struct_s MAPvec;
-/*--------------------------------------------------------------------------------*/
+
 
 #endif

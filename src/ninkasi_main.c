@@ -67,10 +67,10 @@
    double *tt2=dvector(2);
    tt2[0]=ctime_1;
    tt2[1]=tt2[0];
-   alt[0]=deg2rad(atof(argv[1]));
+   alt[0]=mydeg2rad(atof(argv[1]));
    alt[1]=alt[0];
-   az[0]=deg2rad(atof(argv[2]));
-   az[1]=az[0]+deg2rad(78.0/3600/cos(alt[1]));
+   az[0]=mydeg2rad(atof(argv[2]));
+   az[1]=az[0]+mydeg2rad(78.0/3600/cos(alt[1]));
    //az[1]=deg2rad(az[0]+78.0/3600/cos(alt[1]));
    
    observed_altaz_to_mean_radec(&site,30.0,2,tt2,alt,az,ra,dec);

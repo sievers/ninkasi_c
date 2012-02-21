@@ -1325,7 +1325,8 @@ MAP *upres_map(MAP *map)
 MAP *make_map_copy(MAP *map)
 {
   MAP *map_copy;
-  map_copy=(MAP *)malloc_retry(sizeof(MAP));
+  //map_copy=(MAP *)malloc_retry(sizeof(MAP));
+  map_copy=(MAP *)calloc(sizeof(MAP),1);
 
   map_copy->pixsize=map->pixsize;
   map_copy->ramin=map->ramin;
@@ -1779,6 +1780,146 @@ actData  *how_far_am_i_from_radec_radians_vec( actData *ra, actData *dec, int np
   
   return dists;
 }
+
+
+/*--------------------------------------------------------------------------------*/
+void generate_index_mapping(MAP *map, mbTOD *tod, int **inds)
+{
+  assert(map);
+  assert(map->projection);
+#pragma omp parallel shared(map,tod,inds)
+  {
+    PointingFitScratch *scratch=allocate_pointing_fit_scratch(tod);
+#pragma omp for schedule(dynamic,4)
+    for (int i=0;i<tod->ndet;i++) 
+      if ((!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i]))&&(is_det_listed(tod,NULL,i)))
+	get_pointing_vec_new(tod,map,i,inds[i],scratch);  
+    destroy_pointing_fit_scratch(scratch);   
+   }
+}
+/*--------------------------------------------------------------------------------*/
+void find_map_index_limits(MAP *map, mbTOD *tod, int *imin_out, int *imax_out)
+{
+  int imin=map->npix+2;
+  int imax=-1;
+#pragma omp parallel shared(map,tod,imin,imax) default(none)
+  {
+    int myimin=imin;
+    int myimax=imax;
+
+    PointingFitScratch *scratch=allocate_pointing_fit_scratch(tod);
+    int *itmp=(int *)malloc(sizeof(int)*tod->ndata);
+#pragma omp for schedule(dynamic,4)
+    for (int i=0;i<tod->ndet;i++) 
+      if ((!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i]))&&(is_det_listed(tod,NULL,i))) {
+        get_pointing_vec_new(tod,map,i,itmp,scratch);
+	if (tod->kept_data) {
+	  int row=tod->rows[i];
+	  int col=tod->cols[i];
+	  mbUncut *uncut=tod->kept_data[row][col];
+	  for (int region=0;region<uncut->nregions;region++)
+	    for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++) {
+	      if (itmp[j]>myimax)
+		myimax=itmp[j];
+	      if (itmp[j]<myimin)
+		myimin=itmp[j];
+	    }
+	  
+	}
+	else {
+	  if (tod->uncuts) {
+	    int row=tod->rows[i];
+	    int col=tod->cols[i];
+	    mbUncut *uncut=tod->uncuts[row][col];
+	    for (int region=0;region<uncut->nregions;region++)
+	      for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++) {
+		if (itmp[j]>myimax)
+		  myimax=itmp[j];
+		if (itmp[j]<myimin)
+		  myimin=itmp[j];
+	      }
+	  }
+	}
+
+      }
+#pragma omp critical
+    {
+      if (myimin<imin)
+	imin=myimin;
+      if (myimax>imax)
+	imax=myimax;
+    }
+    destroy_pointing_fit_scratch(scratch);
+    free(itmp);
+  }
+  *imin_out=imin;
+  *imax_out=imax;
+  
+}
+/*--------------------------------------------------------------------------------*/
+int *tod2map_actpol(MAP *map, mbTOD *tod, int *ipiv_proc)
+//project a tod into a map, hopefully with better ompness.  It wants to know the
+//index limits for processes when mapping TODs into a map.  If ipiv_proc comes in as null,
+//it will calculate some for you.
+{
+
+  //float **sin2gamma=fmatrix(tod->ndet,tod->ndata);  //eventually polarization goes in.
+  assert(map);
+  assert(map->projection);
+  if (ipiv_proc==NULL) {
+    printf("Nope, pivot finding not yet implemented.\n");
+    return NULL;    
+  }
+    
+  int **inds=imatrix(tod->ndet,tod->ndata);
+  generate_index_mapping(map,tod, inds);
+  
+
+  
+#pragma omp parallel shared(map,tod,inds,ipiv_proc) default(none)
+  {
+    int myid=omp_get_thread_num();
+    
+#pragma omp for
+    for (int i=0;i<tod->ndet;i++) {
+      if ((!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i]))&&(is_det_listed(tod,NULL,i))) {      
+	if (tod->kept_data) {
+	  int row=tod->rows[i];
+	  int col=tod->cols[i];
+	  mbUncut *uncut=tod->kept_data[row][col];
+	  for (int region=0;region<uncut->nregions;region++)
+	    for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++) {
+	      int itmp=inds[i][j];
+	      if ((itmp>=ipiv_proc[myid])&&(itmp<ipiv_proc[myid+1]))
+		map->map[itmp]+=tod->data[i][j];
+	    }
+	}
+	else {
+	  if (tod->uncuts) {
+	    int row=tod->rows[i];
+	    int col=tod->cols[i];
+	    mbUncut *uncut=tod->uncuts[row][col];
+	    for (int region=0;region<uncut->nregions;region++)
+	      for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++) {
+		int itmp=inds[i][j];
+		if ((itmp>=ipiv_proc[myid])&&(itmp<ipiv_proc[myid+1]))
+		  map->map[itmp]+=tod->data[i][j];
+	      }
+	  }
+	  else
+	    for (int j=0;j<tod->ndata;j++)
+	      map->map[inds[i][j]]+=tod->data[i][j];
+	}
+      }
+    }
+  }
+  free(inds[0]);
+  free(inds);
+
+  return NULL;
+
+}
+
 /*--------------------------------------------------------------------------------*/
 void tod2map_nocopy(MAP *map, mbTOD *tod,PARAMS *params)
 {
@@ -1831,6 +1972,15 @@ void tod2map_nocopy(MAP *map, mbTOD *tod,PARAMS *params)
       
 }
 /*--------------------------------------------------------------------------------*/
+int is_map_polarized(MAP *map) 
+{
+#ifdef ACTPOL
+  return (map->pol_state>1);
+#else
+  return 0;
+#endif
+}
+/*--------------------------------------------------------------------------------*/
 void tod2map(MAP *map, mbTOD *tod, PARAMS *params)
 {
 
@@ -1838,12 +1988,20 @@ void tod2map(MAP *map, mbTOD *tod, PARAMS *params)
   assert(map);
   assert(map->projection);
 
+#ifdef ACTPOLFWEEE
+  if (is_map_polarized(map)) {
+    
+    
+    return;
+  }
+#endif
+
 
   int nproc;
 #pragma omp parallel shared(nproc) default(none)
 #pragma omp single
   nproc=omp_get_num_threads();
-
+  
   if (nproc*map->npix*sizeof(actData)>tod->ndata*tod->ndet*sizeof(int)) {
     //printf("doing index-saving projection.\n");
     tod2map_nocopy(map,tod,params);
@@ -2091,17 +2249,57 @@ int tod2cutvec(mbTOD *tod, actData *cutvec)
     }
   return 0;
 }
-
+/*--------------------------------------------------------------------------------*/
+int get_npol_in_map(const MAP *map)
+{
+#ifdef ACTPOL
+  if (map->pol_state<2)
+    return 1;
+  else
+    return (map->pol_state);
+#else
+  return 1;
+#endif
+}
 /*--------------------------------------------------------------------------------*/
 void map2det(const MAP *map, const mbTOD *tod, actData *vec, int *ind, int det, PointingFitScratch *scratch)
 //add a map into a vector.
 {
   //get_pointing_vec(tod,map,det,ind);
   get_pointing_vec_new(tod,map,det,ind,scratch);
-  
+  //#ifdef ACTPOL
+#if 0
+  switch(map->pol_state) {
+  case 0:
+  case 1:
+    for (int j=0;j<tod->ndata;j++) {
+      vec[j]+=map->map[ind[j]];      
+    }
+    break;
+  case 2:  //maps are only (Q,U)
+    for (int j=0;j<tod->ndata;j++) {
+      vec[j]+=map->map[2*ind[j]]*scratch->cos2gamma[j];
+      vec[j]+=map->map[2*ind[j]+1]*scratch->sin2gamma[j];
+    }
+    break;
+  case 3:  //maps are (I,Q,U)
+    for (int j=0;j<tod->ndata;j++) {
+      vec[j]+=map->map[3*ind[j]];
+      vec[j]+=map->map[3*ind[j]+1]*scratch->cos2gamma[j];
+      vec[j]+=map->map[3*ind[j]+2]*scratch->sin2gamma[j];      
+      
+    }
+    break;
+  default:
+    assert(1==0);  //this means we had an unrecognized map type.
+    break;
+  }
+#else
   for (int j=0;j<tod->ndata;j++) {
     vec[j]+=map->map[ind[j]];
   }
+#endif
+
   
 } 
 /*--------------------------------------------------------------------------------*/

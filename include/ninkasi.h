@@ -83,6 +83,9 @@ struct map_struct_s {
   actData *map;
   int nx,ny;
   long npix;
+#ifdef ACTPOL
+  int pol_state;  //flag to tell me how many polarizations I have.  0/1=I, 2=Q+U, 3=I+Q+U
+#endif
 
   //Stuff for reductions
   int have_locks;
@@ -194,6 +197,8 @@ void assign_tod_value(mbTOD *tod, actData val);
 void free_tod_storage(mbTOD *tod);
 void map2det_scaled(const MAP *map, const mbTOD *tod, actData *vec, actData scale_fac, int *ind, int det, PointingFitScratch *scratch);
 void tod2map(MAP *map, mbTOD *tod, PARAMS *params);
+int *tod2map_actpol(MAP *map, mbTOD *tod, int *ipiv_proc);
+
 actData tod_times_map(const MAP *map, const mbTOD *tod, PARAMS *params);
 
 int read_tod_data(mbTOD *tod);
@@ -241,6 +246,9 @@ int tod_hits_source(actData ra, actData dec, actData dist, mbTOD *tod);
 void add_src2tod(mbTOD *tod, actData ra, actData dec, actData src_amp, const actData *beam, actData dtheta, int nbeam, int oversamp);
 void add_srcvec2tod(mbTOD *tod, actData *ra, actData *dec, actData *src_amp, int nsrc,const actData *beam, actData dtheta, int nbeam, int oversamp);
 void tod2srcvec(actData *src_amp_out,mbTOD *tod, actData *ra_in, actData *dec_in, int nsrc_in,const actData *beam, actData dtheta, int nbeam, int oversamp);
+void find_map_index_limits(MAP *map, mbTOD *tod, int *imin_out, int *imax_out);
+
+
 //from ninkasi_projection
 //void get_map_projection(const mbTOD *tod, const MAP *map, int det, int *ind, PointingFitScratch *scratch);
 
