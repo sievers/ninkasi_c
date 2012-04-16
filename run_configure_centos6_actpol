@@ -1,0 +1,36 @@
+#!/bin/bash
+
+LOCAL=${HOME}/local_centos6/
+ACTPOL_LOCAL=/project/r/rbond/nolta/actpol/local
+ACTPOL=/project/r/rbond/nolta/actpol/libactpol/1.1.0/
+#ACTPOL=/project/r/rbond/nolta/actpol/libactpol-0.9/
+
+
+BLAS="-L${MKLROOT}/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core -fopenmp -lpthread"
+HEALPIX=${LOCAL}
+
+IDIRS=" -I../include -I${MKL}/include -I${LOCAL}/include  -I${HEALPIX}/include -I${ACTPOL_LOCAL}/include -I${ACTPOL}/include -fopenmp -DACTPOL -DUSE_HEALPIX"
+
+LDIRS=" -L${LOCAL}/lib -lzzip -lslim -L${MKLROOT}  -L${HEALPIX}/lib -L${SCINET_FFTW_LIB} -L${ACTPOL_LOCAL}/lib -L${ACTPOL}/lib" 
+PREFIX=${LOCAL}
+POLLIBS=" -lactpol -lcfitsio -lslalib -lsofa_c -lwcs -lzzip -lslim -lm"
+
+
+
+
+
+#./configure CC=$LOCAL/opt/openmpi/bin/mpicc \
+#    MPICC=$LOCAL/opt/openmpi/bin/mpicc \
+#    CPPFLAGS="-I$ACT_LOCAL/include -I$MKLROOT/include -I$MKLROOT/include/fftw" \
+#    LDFLAGS="-L$ACT_LOCAL/lib -L$MKLROOT/lib/em64t -lmkl -liomp5 -lpthread -lfftw3xc_intel" \
+#    --prefix=$ACT_LOCAL \
+#    --enable-static
+
+
+
+#use this to attempt to use MKL fft's
+#./configure CPPFLAGS="$IDIRS " LDFLAGS="$LDIRS $POLLIBS -lchealpix  -lcfitsio -lgfortran ${BLAS} -lpthread" --prefix=${PREFIX}   --enable-actdata-double  --enable-static
+
+#use this to explicitly use FFTW fft's
+./configure CPPFLAGS="$IDIRS " LDFLAGS="$LDIRS $POLLIBS -lchealpix  -lcfitsio -lgfortran -lfftw3_threads -lfftw3 ${BLAS} -lpthread" --prefix=${PREFIX}   --enable-actdata-double  --enable-static
+

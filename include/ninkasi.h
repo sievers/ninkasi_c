@@ -4,7 +4,9 @@
 
 
 #include <stdio.h>
+#ifndef NO_FFTW
 #include <fftw3.h>
+#endif
 #include <sys/time.h>
 #include <omp.h>
 #include <ninkasi_defs.h>
@@ -196,6 +198,8 @@ void tod2mapset(MAPvec *maps, mbTOD *tod, PARAMS *params);
 void assign_tod_value(mbTOD *tod, actData val);
 void free_tod_storage(mbTOD *tod);
 void map2det_scaled(const MAP *map, const mbTOD *tod, actData *vec, actData scale_fac, int *ind, int det, PointingFitScratch *scratch);
+
+int get_npol_in_map(const MAP *map);
 void tod2map(MAP *map, mbTOD *tod, PARAMS *params);
 int *tod2map_actpol(MAP *map, mbTOD *tod, int *ipiv_proc);
 

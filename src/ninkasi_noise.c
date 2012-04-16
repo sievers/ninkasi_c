@@ -1018,26 +1018,29 @@ void nkDeButterworth(mbTOD *tod)
     free(filt);
   }
 #else
-
-    actComplex **data_ft=fft_all_data(tod);
+  //printf("FFTing data.\n");
+  actComplex **data_ft=fft_all_data(tod);
+  //printf("Back from FFT.\n");
 #pragma omp parallel shared(tod,data_ft) default(none)
-    {
-      int nn=fft_real2complex_nelem(tod->ndata);
-      actComplex *filt=nkMCEButterworth(tod);
+  {
+    int nn=fft_real2complex_nelem(tod->ndata);
+    actComplex *filt=nkMCEButterworth(tod);
 #pragma omp for
-      for (int i=0;i<tod->ndet;i++)
-	if (!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i])) {
-	  for (int j=0;j<nn;j++)
-	    data_ft[i][j]/=filt[j];  //no normalization required as the all_data transforms do it.	  
-	}
-      free(filt);
-    }
-    
-    ifft_all_data(tod,data_ft);
-    free(data_ft[0]);
-    free(data_ft);
+    for (int i=0;i<tod->ndet;i++)
+      if (!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i])) {
+	for (int j=0;j<nn;j++)
+	  data_ft[i][j]/=filt[j];  //no normalization required as the all_data transforms do it.	  
+      }
+    free(filt);
+  }
+  //printf("Applied filter.\n");
+  ifft_all_data(tod,data_ft);
+  //printf("Data is iffted.\n");
+  free(data_ft[0]);
+  free(data_ft);
+  //printf("And we are done.\n");
 #endif
-
+  
   
 }
 
@@ -1296,12 +1299,28 @@ actComplex **fft_all_data_flag(mbTOD *tod, unsigned flags)
   int *n=ivector(tod->ndet);
   for (int i=0;i<tod->ndet;i++)
     n[i]=tod->ndata;
-  
 
+#ifdef MAX_DET_FFT //if FFT's are touch, cap the # that can be run at once.
+  for (int i=0;i<tod->ndet;i+=MAX_DET_FFT) {
+    int ndet=MAX_DET_FFT;
+    if (ndet>tod->ndet-i)
+      ndet=tod->ndet-i;
+    //fprintf(stderr,"Ndet is %d, i is %d of %d\n",ndet,i,tod->ndet);
+    fftw_plan plan=fftw_plan_many_dft_r2c(1,n+i,ndet,tod->data[i],NULL,1,tod->ndata,data_fft[i],NULL,1,nn,flags);
+    fftw_execute(plan);
+    //fprintf(stderr,"Plan is executed.\n");
+    fftw_destroy_plan(plan);
+  }
+  //fprintf(stderr,"Finished FFT's.\n");
+#else  
+  //fprintf(stderr,"Preparing plan with %d %d %d.\n",tod->ndet,tod->ndata,nn);
   fftw_plan plan=fftw_plan_many_dft_r2c(1,n,tod->ndet,tod->data[0],NULL,1,tod->ndata,data_fft[0],NULL,1,nn,flags);
+  //fprintf(stderr,"Executing plan.\n");
   fftw_execute(plan);
+  //fprintf(stderr,"Executed plan.\n");
   fftw_destroy_plan(plan);
-
+  //fprintf(stderr,"Destroyed plan.\n");
+#endif
   free(n);
 
   return data_fft;

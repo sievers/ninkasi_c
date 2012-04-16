@@ -11,7 +11,9 @@
 #include "act.h"
 #include "mbTOD.h"
 #include "mbCuts.h"
+#ifndef NO_FFTW
 #include <fftw3.h>
+#endif
 #include "sys/time.h"
 #include "mbNoise.h"
 #include <nk_clapack.h>

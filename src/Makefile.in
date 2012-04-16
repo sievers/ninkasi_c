@@ -256,7 +256,6 @@ libninkasi_la_SOURCES = astro.c \
 ninkasi_SOURCES = ninkasi_main.c
 ninkasi_LDADD = libninkasi.la \
 	-lm -lpthread \
-	-lfftw3_threads -lfftw3 -lfftw3f \
 	-lslalib \
 	-lslim  -lpthread
 
@@ -629,6 +628,7 @@ uninstall-am: uninstall-binPROGRAMS uninstall-libLTLIBRARIES
 	mostlyclean-libtool pdf pdf-am ps ps-am tags uninstall \
 	uninstall-am uninstall-binPROGRAMS uninstall-libLTLIBRARIES
 
+#	-lfftw3_threads -lfftw3 -lfftw3f \
 #	-llapack -lgoto2 \
 #	-lcblas -lmkl  \
 #	-lslim -lguide -lpthread

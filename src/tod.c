@@ -6,7 +6,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#ifndef NO_FFTW
 #include <fftw3.h>
+#endif
+
 #include "act.h"
 #include "mbTOD.h"
 #include "mbCuts.h"

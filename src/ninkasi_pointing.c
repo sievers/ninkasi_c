@@ -607,6 +607,7 @@ PointingFitScratch *allocate_pointing_fit_scratch(const mbTOD *tod)
   assert(tod->ndata>0);
 
   PointingFitScratch *scratch=(PointingFitScratch *)malloc(sizeof(PointingFitScratch));
+  //printf("tod->ndata is %d\n",tod->ndata);
   scratch->ra=vector(tod->ndata);
   scratch->dec=vector(tod->ndata);
   scratch->alt=vector(tod->ndata);
@@ -619,13 +620,14 @@ PointingFitScratch *allocate_pointing_fit_scratch(const mbTOD *tod)
 #endif
 
 
-  if (tod->az) {  //breaks if the pointing model is saved.
-    assert(tod->az);  
-    assert(tod->alt);
-    memcpy(scratch->tod_alt,tod->alt,sizeof(actData)*tod->ndata);
-    memcpy(scratch->tod_az,tod->az,sizeof(actData)*tod->ndata);
-  }
-
+  if (!tod->ra_saved)
+    if (tod->az) {  //breaks if the pointing model is saved.
+      assert(tod->az);  
+      assert(tod->alt);
+      memcpy(scratch->tod_alt,tod->alt,sizeof(actData)*tod->ndata);
+      memcpy(scratch->tod_az,tod->az,sizeof(actData)*tod->ndata);
+    }
+  
   if (tod->pointing_fit)
     scratch->pointing_fit=copy_pointing_fit(tod->pointing_fit);
   else
@@ -737,7 +739,7 @@ void get_radec_from_altaz_fit_tiled(const TiledPointingFit *tile, actData *alt, 
 /*--------------------------------------------------------------------------------*/
 void get_radec_from_altaz_fit_1det_coarse(const mbTOD *tod, int det, PointingFitScratch *scratch)
 {
-
+  //printf("in get_radec_from_altaz_fit_1det_coarse\n");
 #if 0
   //drop this in to do exact pointing
   get_radec_from_altaz_exact_1det(tod,det,scratch);
@@ -754,12 +756,15 @@ void get_radec_from_altaz_fit_1det_coarse(const mbTOD *tod, int det, PointingFit
   //If we have saved full pointing information, copy it into *scratch here.
   assert(tod);
   if (tod->ra_saved) {
+    //printf("doing saved pointing.\n");
     assert(tod->dec_saved);
     memcpy(scratch->ra,tod->ra_saved[det],tod->ndata*sizeof(actData));
     memcpy(scratch->dec,tod->dec_saved[det],tod->ndata*sizeof(actData));
+    //printf("finished saved pointing.\n");
     return;
   }
 
+  //printf("Don't think I should be here.\n");
   assert(tod->pointing_fit);
   assert(tod->pointingOffset);
   actData mydalt=get_alt_offset(tod,det);

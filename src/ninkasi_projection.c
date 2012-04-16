@@ -129,6 +129,7 @@ void get_map_projection_wchecks(const mbTOD *tod, const MAP *map, int det, int *
     return;
   }
   get_radec_from_altaz_fit_1det_coarse(tod,det,scratch);
+  //printf("back from get_radec_from_altaz_fit_1det_coarse.\n");
   switch(map->projection->proj_type) {
   case(NK_RECT): 
     //printf("Doing rectangular projection.\n");
@@ -223,6 +224,7 @@ void get_map_projection_wchecks(const mbTOD *tod, const MAP *map, int det, int *
     break;
 
   }
+  //printf("done.\n");
 }
 
 /*--------------------------------------------------------------------------------*/
@@ -615,6 +617,8 @@ nkProjection *upres_projection(nkProjection *proj)
 /*--------------------------------------------------------------------------------*/
 MAP *extract_subregion_map_cea(MAP *map, actData ramin, actData ramax, actData decmin, actData decmax, int do_copy)
 {
+  return NULL; //still in progress
+#if 0
   int xmin,xmax,ymin,ymax;
   radec2pix_cea(map,ramin,decmin,&xmin,&ymin);
   radec2pix_cea(map,ramax,decmax,&xmax,&ymax);
@@ -637,7 +641,9 @@ MAP *extract_subregion_map_cea(MAP *map, actData ramin, actData ramax, actData d
   small_map->map=(actData *)malloc(sizeof(actData)*small_map->npix);
   if (do_copy) {
     int fac=get_npol_in_map(small_map);
-    for (int i=0;i<small_map->ny;i++) 
+    for (int i=0;i<small_map->ny;i++) {
+    }
+    
   }
-
+#endif
 }

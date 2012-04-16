@@ -9,7 +9,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#ifndef NO_FFTW
 #include <fftw3.h>
+#endif
 
 #include <getopt.h>
 #include <omp.h>
@@ -2028,7 +2030,9 @@ void tod2map(MAP *map, mbTOD *tod, PARAMS *params)
 #pragma omp for nowait
     for (int i=0;i<tod->ndet;i++) { 
       if ((!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i]))&&(is_det_listed(tod,params,i))) {
+	//printf("doing first stuff.\n");
 	get_pointing_vec_new(tod,map,i,ind,scratch);
+	//printf("got pointing vec.\n");
 	if (tod->kept_data) {
 	  int row=tod->rows[i];
 	  int col=tod->cols[i];
@@ -2039,6 +2043,7 @@ void tod2map(MAP *map, mbTOD *tod, PARAMS *params)
 	}
 	else {
 	  if (tod->uncuts) {
+	    //printf("doing uncuts.\n");
 	    int row=tod->rows[i];
 	    int col=tod->cols[i];
 	    mbUncut *uncut=tod->uncuts[row][col];
@@ -2053,6 +2058,7 @@ void tod2map(MAP *map, mbTOD *tod, PARAMS *params)
       }
     }
     
+    //printf("ready to accumulate.\n");
     
     omp_reduce_map(map,mymap);
     free(ind);

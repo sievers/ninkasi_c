@@ -6,7 +6,13 @@
 #endif
 
 
+#ifndef NO_FFTW
 #include <fftw3.h>
+#else
+#include <fftw/fftw3.h>  //we are here because we're assuming fftw isn't being included because we're using the intel ffts from MKL
+#endif
+
+
 #include <complex.h>
 
 #define MAXLEN 256
@@ -17,6 +23,7 @@
 #define MAXDET 2000   //these two guys are only for setting seeds consistently if
 #define MAXTOD 10000   //simulating noise internally.   Take that back - also now statically store space for tod filenames.
 
+//#define MAX_DET_FFT 400  //Due to some odd seg faulting behavior with MKL/FFTW interactions.
 
 #define ACT_NO_VALUE -98747423
 
