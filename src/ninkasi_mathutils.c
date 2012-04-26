@@ -415,6 +415,20 @@ void act_gemm(char transa, char transb, int m, int n, int k, actData alpha, actD
 #endif
 
 }
+/*--------------------------------------------------------------------------------*/
+actData act_dot(int n, actData *x, int incx, actData *y, int incy)
+{
+  actData tot=0.0;
+  if (incx==incy==1) {
+    for (int i=0;i<n;i++)
+      tot+=x[i]*y[i];
+  }
+  else {
+    for (int i=0;i<n;i++) 
+      tot+=x[i*incx]*y[i*incy];
+  }
+  return tot;
+}
 
 /*--------------------------------------------------------------------------------*/
 

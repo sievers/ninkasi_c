@@ -154,7 +154,7 @@ typedef struct {
   bool point_absent;   //!< Are the az/alt encoder channels absent from the raw data?
   psS32 *tv_sec;       //!< time (seconds since Unix Epoch)
   psS32 *tv_usec;      //!< time (microseconds since second; 0 <= tv_usec < 1e6)
-  float *dt;           //!< time (seconds since the start of the scan)
+  double *dt;           //!< time (seconds since the start of the scan) 
   float sampleTime;    //!< time (seconds since the start of the scan)
   actData *az;           //!< azimuth of boresight; radians
   actData *alt;          //!< altitude of boresight; radians
