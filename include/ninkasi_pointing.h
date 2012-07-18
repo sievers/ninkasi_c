@@ -67,6 +67,8 @@ ACTpolPointingFit *initialize_actpol_pointing(mbTOD *tod, actData *dx, actData *
 void precalc_actpol_pointing(mbTOD *tod);
 void precalc_actpol_pointing_free(mbTOD *tod);
 void get_radec_one_det_actpol(mbTOD *tod,int det,PointingFitScratch *scratch);
+void get_radec_from_altaz_actpol_c(double *az, double *el, double *tvec, double *dx, double *dy, double *theta, double *ra, double *dec, int nhorns, int nt);
+
 
 #endif
 

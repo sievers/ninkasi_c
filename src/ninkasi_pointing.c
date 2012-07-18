@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
+#include <omp.h>
 
 #include "ninkasi.h"
 #include "ninkasi_mathutils.h"
@@ -1472,3 +1473,58 @@ void get_radec_one_det_actpol(mbTOD *tod,int det,PointingFitScratch *scratch)
 
 #endif
 /*--------------------------------------------------------------------------------*/
+#ifdef ACTPOL
+void get_radec_from_altaz_actpol_c(double *az, double *el, double *tvec, double *dx, double *dy, double *theta, double *ra, double *dec, int nhorns, int nt)
+{
+  double azmin=az[0];
+  double azmax=az[0];
+  for (int i=1;i<nt;i++) {
+    if (az[i]<azmin)
+      azmin=az[i];
+    if (az[i]>azmax)
+      azmax=az[i];
+  }
+  double az_cent=0.5*(azmin+azmax);
+  double az_throw=0.5*(azmax-azmin);
+  //#pragma omp parallel shared(az,el,tvec,dx,dy,theta,ra,dec,nhorns,nt,az_cent,az_throw) default(none)
+  {
+    printf("running with %d threads\n",omp_get_num_threads());
+    ACTpolArray *array = ACTpolArray_alloc(nhorns);
+    double xcent=0.0;
+    double ycent=0.0;
+    double freq=148.0;
+    ACTpolArray_init(array, freq, xcent,ycent);
+    for (int i=0;i<nhorns;i++) {
+      ACTpolFeedhorn_init(&(array->horn[i]),dx[i],dy[i],theta[i]);
+    }
+    ACTpolWeather weather;
+    ACTpolWeather_default(&weather);
+
+
+    ACTpolArrayCoords *coords = ACTpolArrayCoords_alloc(array);
+    ACTpolArrayCoords_init(coords);
+
+    ACTpolState *state = ACTpolState_alloc();
+    ACTpolState_init(state);
+    
+    ACTpolScan scan;
+    ACTpolScan_init(&scan, el[0], az_cent,az_throw);
+    ACTpolArrayCoords_update_refraction(coords, &scan, &weather);
+    printf("starting loop.\n");
+    //#pragma omp for
+    for (int i=0;i<nt;i++) {
+      ACTpolState_update(state, tvec[i],el[i],az[i]);
+      ACTpolArrayCoords_update(coords, state);
+      for (int j=0;j<nhorns;j++) {
+        ACTpolFeedhornCoords *fc = &(coords->horn[j]);
+	ra[i*nhorns+j]=fc->ra;
+        dec[i*nhorns+j]=fc->dec;
+        //sin2gamma[i+j*nelem]=fc->sin2gamma;
+        //cos2gamma[i+j*nelem]=fc->cos2gamma;
+      }      
+    }
+    printf("ending loop.\n");
+    
+  }
+}
+#endif
