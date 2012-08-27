@@ -233,7 +233,7 @@ typedef struct {
   //ACTpolArray *polarray;
   //ACTpolWeather weather;  //if there's TOD-based weather info.
   ACTpolPointingFit *actpol_pointing;
-  actData *hpw;
+  actData *hwp;
 #endif
 
   PointingFit *pointing_fit;  //pointing fit, turn alt/az into ra/dec

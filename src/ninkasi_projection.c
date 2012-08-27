@@ -647,3 +647,4 @@ MAP *extract_subregion_map_cea(MAP *map, actData ramin, actData ramax, actData d
   }
 #endif
 }
+/*--------------------------------------------------------------------------------*/
