@@ -80,6 +80,8 @@ typedef struct {
   int nhorn;
   actData *dx;
   actData *dy;
+  actData *theta;
+  actData freq;
   ACTpolArray *array;
   actData alt0;
   actData az0;
@@ -234,6 +236,7 @@ typedef struct {
   //ACTpolWeather weather;  //if there's TOD-based weather info.
   ACTpolPointingFit *actpol_pointing;
   actData *hwp;
+  actData **twogamma_saved;
 #endif
 
   PointingFit *pointing_fit;  //pointing fit, turn alt/az into ra/dec

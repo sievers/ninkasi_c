@@ -156,6 +156,8 @@ void get_pointing_vec_new(const mbTOD *tod, const MAP *map, int det, int *ind, P
 void write_tod_pointing_to_disk(const mbTOD *tod, char *fname);
 void mapset2det(const MAPvec *maps, mbTOD *tod, const PARAMS *params, actData *vec, int *ind, int det, PointingFitScratch *scratch);
 void map2tod(const MAP *map, mbTOD *tod,const PARAMS *params);
+void polmap2tod(MAP *map, mbTOD *tod);
+
 void clear_map(MAP *map);
 void clear_tod(mbTOD *tod);
 actData **matrix(long n,long m);
@@ -200,8 +202,14 @@ void free_tod_storage(mbTOD *tod);
 void map2det_scaled(const MAP *map, const mbTOD *tod, actData *vec, actData scale_fac, int *ind, int det, PointingFitScratch *scratch);
 
 int get_npol_in_map(const MAP *map);
+void set_map_polstate(MAP *map, int *pol_state);
+int is_map_polarized(MAP *map);
+
+
 void tod2map(MAP *map, mbTOD *tod, PARAMS *params);
+void tod2polmap(MAP *map,mbTOD *tod);
 int *tod2map_actpol(MAP *map, mbTOD *tod, int *ipiv_proc);
+
 
 actData tod_times_map(const MAP *map, const mbTOD *tod, PARAMS *params);
 
