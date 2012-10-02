@@ -1409,6 +1409,8 @@ void precalc_actpol_pointing_exact(mbTOD *tod)
   }
 #pragma omp parallel shared(tod) default(none)
   {
+    const bool do_hwp=(tod->hwp!=NULL);  //maybe declaring this const will let HWP adjustment happen quickly
+    
     ACTpolArray *array = ACTpolArray_alloc(tod->ndet);
     double xcent=0.0;
     double ycent=0.0;
@@ -1446,6 +1448,9 @@ void precalc_actpol_pointing_exact(mbTOD *tod)
 	tod->ra_saved[j][i]=fc->ra;
 	tod->dec_saved[j][i]=fc->dec;
 	tod->twogamma_saved[j][i]=atan2(fc->sin2gamma,fc->cos2gamma);
+	if (do_hwp)
+	  tod->twogamma_saved[j][i]+=tod->hwp[i];
+	
       }
     }
 
