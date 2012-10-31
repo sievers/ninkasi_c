@@ -473,7 +473,27 @@ double *read_1d_datafile_double(char *fname, int *n)
   fclose(infile);
   return vec;
 }
+/*--------------------------------------------------------------------------------*/
 
+void purge_vector(mbTOD *tod, actData *vec, int ngood)
+{
+  //printf("shrinking from %d to %d\n",tod->ndet,ngood);
+  actData *tmp=vector(ngood);
+  int icur=0;
+  for (int i=0;i<tod->ndet;i++) {
+    if (!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i])) {
+      tmp[icur]=vec[i];
+      icur++;
+    }
+  }
+  actData *crud=(actData *)realloc(vec,sizeof(actData)*ngood);
+  assert(crud==vec);
+  memcpy(vec,tmp,sizeof(actData)*ngood);
+  free(tmp);
+  
+  //free(vec);
+  //*vec_in=tmp;
+}
 /*--------------------------------------------------------------------------------*/
 void purge_cut_detectors(mbTOD *tod)
 {
@@ -481,6 +501,18 @@ void purge_cut_detectors(mbTOD *tod)
   for (int i=0;i<tod->ndet;i++)
     if (!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i]))
       ngood++;
+
+#ifdef ACTPOL
+  if (tod->actpol_pointing) {
+    ACTpolPointingFit *fit=tod->actpol_pointing;
+    if (fit->dx) 
+      purge_vector(tod,(tod->actpol_pointing->dx),ngood);
+    if (fit->dy)
+      purge_vector(tod,(tod->actpol_pointing->dy),ngood);
+    if (fit->theta)
+      purge_vector(tod,(tod->actpol_pointing->theta),ngood);
+  }
+#endif
 
   int *rows=(int *)malloc_retry(sizeof(int)*ngood);
   int *cols=(int *)malloc_retry(sizeof(int)*ngood);

@@ -1297,7 +1297,6 @@ ACTpolPointingFit *initialize_actpol_pointing(mbTOD *tod, actData *dx, actData *
   ACTpolPointingFit *fit=(ACTpolPointingFit *)calloc(1,sizeof(ACTpolPointingFit));
   int nhorns=tod->ndet;
   ACTpolArray *array = ACTpolArray_alloc(nhorns);
-  
 
   fit->dx=vector(tod->ndet);
   fit->dy=vector(tod->ndet);
@@ -1449,7 +1448,7 @@ void precalc_actpol_pointing_exact(mbTOD *tod)
 	tod->dec_saved[j][i]=fc->dec;
 	tod->twogamma_saved[j][i]=atan2(fc->sin2gamma,fc->cos2gamma);
 	if (do_hwp)
-	  tod->twogamma_saved[j][i]+=tod->hwp[i];
+	  tod->twogamma_saved[j][i]+=4*tod->hwp[i];
 	
       }
     }

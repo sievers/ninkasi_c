@@ -78,6 +78,7 @@ typedef struct {
 #ifdef ACTPOL
 typedef struct {
   int nhorn;
+
   actData *dx;
   actData *dy;
   actData *theta;

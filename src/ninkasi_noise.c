@@ -989,6 +989,44 @@ actComplex *nkMCEButterworth(mbTOD *tod)
   return filt;
     
 }
+/*--------------------------------------------------------------------------------*/
+void apply_real_filter_to_data(mbTOD *tod, actData *filt)
+{
+  assert(tod->data);
+  actComplex **data_ft=fft_all_data(tod);
+  const int nn=fft_real2complex_nelem(tod->ndata);
+  
+#pragma omp parallel for shared(tod,data_ft,filt) default(none)
+  for (int i=0;i<tod->ndet;i++)
+    if (!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i])) {
+      for (int j=0;j<nn;j++)
+	data_ft[i][j]*=filt[j];  
+    }
+  
+  ifft_all_data(tod,data_ft);
+  free(data_ft[0]);
+  free(data_ft);  
+}
+
+
+/*--------------------------------------------------------------------------------*/
+void apply_complex_filter_to_data(mbTOD *tod, actComplex *filt)
+{
+  assert(tod->data);
+  actComplex **data_ft=fft_all_data(tod);
+  const int nn=fft_real2complex_nelem(tod->ndata);
+  
+#pragma omp parallel for shared(tod,data_ft,filt) default(none)
+  for (int i=0;i<tod->ndet;i++)
+    if (!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i])) {
+      for (int j=0;j<nn;j++)
+	data_ft[i][j]*=filt[j];  
+    }
+  
+  ifft_all_data(tod,data_ft);
+  free(data_ft[0]);
+  free(data_ft);  
+}
 
 /*--------------------------------------------------------------------------------*/
 void nkDeButterworth(mbTOD *tod)
