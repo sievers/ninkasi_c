@@ -55,6 +55,9 @@ struct todvec_struct_s {
 typedef struct todvec_struct_s TODvec;
 /*--------------------------------------------------------------------------------*/
 
+
+#define MAX_NPOL 4
+
 struct map_struct_s {
   actData pixsize;
   actData ramin,ramax,decmin,decmax;
@@ -62,7 +65,8 @@ struct map_struct_s {
   int nx,ny;
   long npix;
 #ifdef ACTPOL
-  int pol_state;  //flag to tell me how many polarizations I have.  0/1=I, 2=Q+U, 3=I+Q+U
+  //int pol_state;  //flag to tell me how many polarizations I have.  0/1=I, 2=Q+U, 3=I+Q+U
+  int pol_state[MAX_NPOL];  //flag to tell me how many polarizations I have.  0/1=I, 2=Q+U, 3=I+Q+U
 #endif
 
 

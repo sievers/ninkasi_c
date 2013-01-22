@@ -135,7 +135,7 @@ void *malloc_retry(size_t n)
     void *vec=malloc(n);
     if (vec)
       return vec;
-    fprintf(stderr,"Malloc failure when asking for %d bytes..  Retrying %d...\n",n,i);
+    fprintf(stderr,"Malloc failure when asking for %ld bytes..  Retrying %d...\n",n,i);
     pca_pause(pause_len);
   }
   return NULL;
@@ -441,13 +441,14 @@ actData *read_1d_datafile(char *fname, int *n)
   if (!infile)
     return NULL;
   int n_check;
-  fread(&n_check,1,sizeof(int),infile);
+  size_t crap; //just pulling the values of fread so we don't get warnings.
+  crap=fread(&n_check,1,sizeof(int),infile);
   if (*n!=0) 
     assert(*n==n_check);
   else
     *n=n_check;
   actData *vec=vector(*n);
-  fread(vec,*n,sizeof(actData),infile);
+  crap=fread(vec,*n,sizeof(actData),infile);
   fclose(infile);
   return vec;
 }
@@ -461,17 +462,38 @@ double *read_1d_datafile_double(char *fname, int *n)
   if (!infile)
     return NULL;
   int n_check;
-  fread(&n_check,1,sizeof(int),infile);
+  size_t crap;  //pull return value of fread just to avoid a warning
+  crap=fread(&n_check,1,sizeof(int),infile);
   if (*n!=0) 
     assert(*n==n_check);
   else
     *n=n_check;
   double *vec=(double *)malloc_retry(sizeof(double)*(*n));
-  fread(vec,*n,sizeof(double),infile);
+  crap=fread(vec,*n,sizeof(double),infile);
   fclose(infile);
   return vec;
 }
+/*--------------------------------------------------------------------------------*/
 
+void purge_vector(mbTOD *tod, actData *vec, int ngood)
+{
+  //printf("shrinking from %d to %d\n",tod->ndet,ngood);
+  actData *tmp=vector(ngood);
+  int icur=0;
+  for (int i=0;i<tod->ndet;i++) {
+    if (!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i])) {
+      tmp[icur]=vec[i];
+      icur++;
+    }
+  }
+  actData *crud=(actData *)realloc(vec,sizeof(actData)*ngood);
+  assert(crud==vec);
+  memcpy(vec,tmp,sizeof(actData)*ngood);
+  free(tmp);
+  
+  //free(vec);
+  //*vec_in=tmp;
+}
 /*--------------------------------------------------------------------------------*/
 void purge_cut_detectors(mbTOD *tod)
 {
@@ -479,6 +501,18 @@ void purge_cut_detectors(mbTOD *tod)
   for (int i=0;i<tod->ndet;i++)
     if (!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i]))
       ngood++;
+
+#ifdef ACTPOL
+  if (tod->actpol_pointing) {
+    ACTpolPointingFit *fit=tod->actpol_pointing;
+    if (fit->dx) 
+      purge_vector(tod,(tod->actpol_pointing->dx),ngood);
+    if (fit->dy)
+      purge_vector(tod,(tod->actpol_pointing->dy),ngood);
+    if (fit->theta)
+      purge_vector(tod,(tod->actpol_pointing->theta),ngood);
+  }
+#endif
 
   int *rows=(int *)malloc_retry(sizeof(int)*ngood);
   int *cols=(int *)malloc_retry(sizeof(int)*ngood);
@@ -1256,7 +1290,10 @@ MAP *make_blank_map_copy(const MAP *map)
   map_copy->ny=map->ny;
   map_copy->npix=map->npix;
   map_copy->have_locks=0;  //don't recycle locks.  will create them as needed, if needed.
-  map_copy->map=(actData *)malloc_retry(sizeof(actData)*map_copy->npix);
+#ifdef ACTPOL
+  memcpy(map_copy->pol_state,map->pol_state,MAX_NPOL*sizeof(map->pol_state[0]));
+#endif
+  map_copy->map=(actData *)malloc_retry(sizeof(actData)*map_copy->npix*get_npol_in_map(map));
   //memcpy(map_copy->map,map->map,sizeof(actData)*map_copy->npix);
   clear_map(map_copy);
   return map_copy;
@@ -1342,7 +1379,10 @@ MAP *make_map_copy(MAP *map)
   memcpy(map_copy->projection,map->projection,sizeof(nkProjection));
   map_copy->have_locks=0;  //don't recycle locks.  will create them as needed, if needed.
   map_copy->map=(actData *)malloc_retry(sizeof(actData)*map_copy->npix);
-  memcpy(map_copy->map,map->map,sizeof(actData)*map_copy->npix);
+#ifdef ACTPOL
+  memcpy(map_copy->pol_state,map->pol_state,MAX_NPOL*sizeof(map->pol_state[0]));
+#endif
+  memcpy(map_copy->map,map->map,sizeof(actData)*map_copy->npix*get_npol_in_map(map));
   return map_copy;
 }
 /*--------------------------------------------------------------------------------*/
@@ -1378,7 +1418,7 @@ MAPvec *make_mapset_copy(MAPvec *maps)
 /*--------------------------------------------------------------------------------*/
 void clear_map(MAP *map)
 {
-  memset(map->map,0,sizeof(actData)*map->npix);
+  memset(map->map,0,sizeof(actData)*map->npix*get_npol_in_map(map));
 }
 /*--------------------------------------------------------------------------------*/
 void clear_mapset(MAPvec *maps)
@@ -1977,7 +2017,12 @@ void tod2map_nocopy(MAP *map, mbTOD *tod,PARAMS *params)
 int is_map_polarized(MAP *map) 
 {
 #ifdef ACTPOL
-  return (map->pol_state>1);
+  //return (map->pol_state>1);
+  //If anything past the first polarization slot is populated, we're polarized
+  for (int i=1;i<MAX_NPOL;i++)
+    if (map->pol_state[i])
+      return 1;
+  return 0;
 #else
   return 0;
 #endif
@@ -1991,26 +2036,25 @@ void tod2map(MAP *map, mbTOD *tod, PARAMS *params)
   assert(map->projection);
 
 #ifdef ACTPOLFWEEE
-  if (is_map_polarized(map)) {
-    
-    
+  if (is_map_polarized(map)) {       
     return;
   }
 #endif
 
 
   int nproc;
+  printf("projecting TOD into map.\n");
 #pragma omp parallel shared(nproc) default(none)
 #pragma omp single
   nproc=omp_get_num_threads();
   
   if (nproc*map->npix*sizeof(actData)>tod->ndata*tod->ndet*sizeof(int)) {
-    //printf("doing index-saving projection.\n");
+    printf("doing index-saving projection.\n");
     tod2map_nocopy(map,tod,params);
     return;
   }
   //else
-  // printf("doing old projection.\n");
+  printf("doing old projection.\n");
 
 
 
@@ -2022,11 +2066,10 @@ void tod2map(MAP *map, mbTOD *tod, PARAMS *params)
   }
 #pragma omp parallel shared(tod,map,params) default(none)
   { 
-
-    MAP *mymap=make_blank_map_copy(map);
+    MAP *mymap=make_blank_map_copy(map);    
     int *ind=(int *)malloc_retry(sizeof(int)*tod->ndata);
-    PointingFitScratch *scratch=allocate_pointing_fit_scratch(tod);
 
+    PointingFitScratch *scratch=allocate_pointing_fit_scratch(tod);
 #pragma omp for nowait
     for (int i=0;i<tod->ndet;i++) { 
       if ((!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i]))&&(is_det_listed(tod,params,i))) {
@@ -2065,6 +2108,108 @@ void tod2map(MAP *map, mbTOD *tod, PARAMS *params)
     destroy_pointing_fit_scratch(scratch);
     destroy_map(mymap);
   } 
+}
+/*--------------------------------------------------------------------------------*/
+void polmap2tod(MAP *map, mbTOD *tod)
+{
+  assert(tod);
+  assert(tod->data);
+  assert(tod->pixelization_saved);
+  int cur_pol=0;
+  //loop through possible polarization states and project the ones we find.
+  for (int pol_ind=0;pol_ind<MAX_NPOL;pol_ind++)
+    if (map->pol_state[pol_ind]) {
+      if (pol_ind==0) {  //I 
+#pragma omp parallel shared(pol_ind,map,tod,cur_pol)
+	for (int det=0;det<tod->ndet;det++) {
+	  int row=tod->rows[det];
+	  int col=tod->cols[det];
+	  mbUncut *uncut=tod->uncuts[row][col];
+	  for (int region=0;region<uncut->nregions;region++)
+	    for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++)
+	      tod->data[det][j]+=map->map[tod->pixelization_saved[det][j]];
+	}
+	cur_pol++;
+      }
+      if (pol_ind==1) {  //Q
+#pragma omp parallel shared(pol_ind,map,tod,cur_pol)
+        for (int det=0;det<tod->ndet;det++) {
+          int row=tod->rows[det];
+          int col=tod->cols[det];
+          mbUncut *uncut=tod->uncuts[row][col];
+          for (int region=0;region<uncut->nregions;region++)
+            for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++)
+              tod->data[det][j]+=map->map[tod->pixelization_saved[det][j]+cur_pol*map->npix]*sin(tod->twogamma_saved[det][j]);
+	}
+	cur_pol++;
+      }
+      if (pol_ind==2) {  //U
+#pragma omp parallel shared(pol_ind,map,tod,cur_pol)
+        for (int det=0;det<tod->ndet;det++) {
+          int row=tod->rows[det];
+          int col=tod->cols[det];
+          mbUncut *uncut=tod->uncuts[row][col];
+          for (int region=0;region<uncut->nregions;region++)
+            for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++)
+              tod->data[det][j]+=map->map[tod->pixelization_saved[det][j]+cur_pol*map->npix]*cos(tod->twogamma_saved[det][j]);
+	}
+	cur_pol++;
+      }
+      
+    }
+}
+/*--------------------------------------------------------------------------------*/
+
+void tod2polmap(MAP *map,mbTOD *tod)
+{
+  assert(tod);
+  assert(tod->data);
+  assert(tod->pixelization_saved);
+  int cur_pol=0;
+  //loop through possible polarization states and project the ones we find.
+  for (int pol_ind=0;pol_ind<MAX_NPOL;pol_ind++)
+    if (map->pol_state[pol_ind]) {
+      if (pol_ind==0) {  //I 
+#pragma omp parallel shared(pol_ind,map,tod,cur_pol)
+	for (int det=0;det<tod->ndet;det++) {
+	  int row=tod->rows[det];
+	  int col=tod->cols[det];
+	  mbUncut *uncut=tod->uncuts[row][col];
+	  for (int region=0;region<uncut->nregions;region++)
+	    for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++)
+#pragma omp atomic
+	      map->map[tod->pixelization_saved[det][j]]+=tod->data[det][j];
+	}
+	cur_pol++;
+      }
+      if (pol_ind==1) {  //Q
+#pragma omp parallel shared(pol_ind,map,tod,cur_pol)
+        for (int det=0;det<tod->ndet;det++) {
+          int row=tod->rows[det];
+          int col=tod->cols[det];
+          mbUncut *uncut=tod->uncuts[row][col];
+          for (int region=0;region<uncut->nregions;region++)
+            for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++)
+#pragma omp atomic
+	      map->map[tod->pixelization_saved[det][j]+cur_pol*map->npix]+=tod->data[det][j]*sin(tod->twogamma_saved[det][j]);
+	}
+	cur_pol++;
+      }
+      if (pol_ind==2) {  //U
+#pragma omp parallel shared(pol_ind,map,tod,cur_pol)
+        for (int det=0;det<tod->ndet;det++) {
+          int row=tod->rows[det];
+          int col=tod->cols[det];
+          mbUncut *uncut=tod->uncuts[row][col];
+          for (int region=0;region<uncut->nregions;region++)
+            for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++)
+#pragma omp atomic
+	      map->map[tod->pixelization_saved[det][j]+cur_pol*map->npix]+=tod->data[det][j]*cos(tod->twogamma_saved[det][j]);
+	}
+	cur_pol++;
+      }
+      
+    }
 }
 /*--------------------------------------------------------------------------------*/
 
@@ -2256,17 +2401,60 @@ int tod2cutvec(mbTOD *tod, actData *cutvec)
   return 0;
 }
 /*--------------------------------------------------------------------------------*/
+int _get_npol_in_state(const int *pol_state)
+{
+#ifdef ACTPOL
+  int tot=0;
+  for (int i=0;i<MAX_NPOL;i++)
+    if (pol_state[i])
+      tot++;
+  //if (tot==0)
+  // tot=1;  //We probably meant to have TT
+ 
+  return tot;
+#else
+  return 1;
+#endif
+  
+  
+}
+/*--------------------------------------------------------------------------------*/
 int get_npol_in_map(const MAP *map)
 {
 #ifdef ACTPOL
-  if (map->pol_state<2)
-    return 1;
-  else
-    return (map->pol_state);
+  const int *ptr=map->pol_state;//&(map->pol_state[0]);
+  return _get_npol_in_state(ptr);
 #else
   return 1;
 #endif
 }
+/*--------------------------------------------------------------------------------*/
+#ifdef ACTPOL
+void set_map_polstate(MAP *map, int *pol_state)
+{
+  int old_npol=get_npol_in_map(map);
+  int new_npol=_get_npol_in_state(pol_state);
+  
+  actData **new_map=matrix(new_npol,map->npix);
+  memset(new_map[0],0,sizeof(actData)*new_npol*map->npix);
+  if (map->map) {
+    int old_ind=0;
+    int new_ind=0;
+    for (int i=0;i<MAX_NPOL;i++) {
+      if ((map->pol_state[i])&&(pol_state[i])) 
+	memcpy(new_map[new_ind],&(map->map[old_ind*map->npix]),map->npix*sizeof(actData));
+      if (map->pol_state[i])
+	old_ind++;
+      if (pol_state[i])
+	new_ind++;
+    }
+    free(map->map);
+    map->map=new_map[0];
+    free(new_map);  //only freeing the pointer to the pointers, keeping the actual address saved.
+    memcpy(map->pol_state,pol_state,sizeof(pol_state[0])*MAX_NPOL);
+  }
+}
+#endif
 /*--------------------------------------------------------------------------------*/
 void map2det(const MAP *map, const mbTOD *tod, actData *vec, int *ind, int det, PointingFitScratch *scratch)
 //add a map into a vector.
@@ -2371,6 +2559,7 @@ void map2tod(const MAP *map, mbTOD *tod,const PARAMS *params)
 {
   
   assert(tod->have_data);
+
   actData scale_fac=1.0;
   if (params)
     scale_fac=*((actData *)params);
@@ -3194,7 +3383,7 @@ void copy_map2map(MAP *map2, MAP *map)
 {
   assert(map->npix==map2->npix);
   assert(map->npix>0);
-  memcpy(map2->map,map->map,sizeof(actData)*map->npix);
+  memcpy(map2->map,map->map,sizeof(actData)*map->npix*get_npol_in_map(map));
 }
 /*--------------------------------------------------------------------------------*/
 void copy_mapset2mapset(MAPvec *map2, MAPvec *map)

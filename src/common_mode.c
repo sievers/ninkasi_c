@@ -25,7 +25,7 @@
 #ifndef _SKIP_MKL
 #include <mkl.h>
 #else
-#include <cblas.h>
+//#include <cblas.h>
 #endif
 #include <nk_clapack.h>
 #include "ninkasi_mathutils.h"
@@ -221,6 +221,37 @@ void mbCleanUpCommonMode(mbNoiseCommonMode *data)
 
 static void sgemm_simple(int k, int m, int n,actData *a,int alen_is_n, actData *b,int blen_is_n, actData *c)
 {
+#if 1
+  char transa,transb;
+  int alen,blen;
+  if (alen_is_n) {
+    transa='N';
+    alen=n;
+  } else {
+    transa='T';
+    alen=k;
+  }
+
+
+  if (blen_is_n) {
+    transb='T';
+    blen=n;
+  } else {
+    transb='N';
+    blen=m; 
+  }
+
+
+  act_gemm(transa,transb,m,n,k,1.0,a,alen,b,blen,0.0,c,m);
+  //  actData done=1.0;
+  //  actData dzero=0.0;
+  //#ifdef ACTDATA_DOUBLE
+  //  dgemm_(&transa,&transb,&m,&n,&k,&done,a,&alen,b,&blen,&dzero,c,&m);
+  //#else
+  //  sgemm_(&transa,&transb,&m,&n,&k,&done,a,&alen,b,&blen,&dzero,c,&m);
+  //#endif
+  
+#else
   //int transa,alen, transb,blen;
   int alen, blen;
 #ifdef _SKIP_MKL
@@ -247,6 +278,7 @@ static void sgemm_simple(int k, int m, int n,actData *a,int alen_is_n, actData *
   cblas_dgemm(CblasRowMajor,transa,transb,k,m,n,1.0,a,alen,b,blen,0.0,c,m);
 #else
   cblas_sgemm(CblasRowMajor,transa,transb,k,m,n,1.0,a,alen,b,blen,0.0,c,m);
+#endif
 #endif
 }
 
@@ -886,14 +918,20 @@ void mbCalculateCommonModeFitParams(mbNoiseCommonMode *fit)
   assert(fit->have_data==true);  //A copy of the rescaled data should exist here.
 
   actData **ata=psAllocMatrix(fit->nparam,fit->nparam);
+
+
+#if 1
+  act_gemm('N','T',fit->nparam,fit->nparam,fit->ndata,1,fit->vecs[0],fit->ndata,fit->vecs[0],fit->ndata,0,ata[0],fit->nparam);
+#else
 #ifdef ACTDATA_DOUBLE
   cblas_dgemm(CblasRowMajor,CblasNoTrans,CblasTrans, fit->nparam, fit->nparam, fit->ndata,1, 
               fit->vecs[0], fit->ndata ,fit->vecs[0],fit->ndata,0,ata[0],fit->nparam);
 #else
   cblas_sgemm(CblasRowMajor,CblasNoTrans,CblasTrans, fit->nparam, fit->nparam, fit->ndata,1, 
               fit->vecs[0], fit->ndata ,fit->vecs[0],fit->ndata,0,ata[0],fit->nparam);
-
 #endif
+#endif
+
   //psTrace("moby.pcg",3,"Made ata at %8.5f seconds.\n",mbElapsedTime(&ticker));      
   
   if (!fit->have_ata) { //if we don't have te 
@@ -936,6 +974,10 @@ void mbCalculateCommonModeFitParams(mbNoiseCommonMode *fit)
 
   // ???
   actData **tmp_mat=psAllocMatrix(fit->nparam,fit->ndet);
+
+#if 1
+  act_gemm('N','T',fit->nparam,fit->ndet,fit->ndata,1.0,fit->vecs[0],fit->ndata,fit->data[0],fit->ndata,0.0,tmp_mat[0],fit->ndet);
+#else
 #ifdef ACTDATA_DOUBLE
   cblas_dgemm(CblasRowMajor,CblasNoTrans,CblasTrans, fit->nparam, fit->ndet, fit->ndata,1, 
               fit->vecs[0], fit->ndata ,fit->data[0],fit->ndata,0,tmp_mat[0],fit->ndet);
@@ -943,7 +985,7 @@ void mbCalculateCommonModeFitParams(mbNoiseCommonMode *fit)
   cblas_sgemm(CblasRowMajor,CblasNoTrans,CblasTrans, fit->nparam, fit->ndet, fit->ndata,1, 
               fit->vecs[0], fit->ndata ,fit->data[0],fit->ndata,0,tmp_mat[0],fit->ndet);
 #endif
-
+#endif
   if ((!fit->have_atx)||(fit->atx==NULL)) {
     fit->atx=psAllocMatrix(fit->nparam,fit->ndet);
     memcpy(fit->atx[0],tmp_mat[0],fit->nparam*fit->ndet*sizeof(actData));
@@ -1043,12 +1085,17 @@ void mbCalculateCommonFracErrs(const mbTOD *tod, mbNoiseCommonMode *fit)
     // If the common mode has been applied, we can go to town.  Otherwise, we need to calculate the
     // de-common-moded data before we can do the fractional errors.
     if (fit->common_is_applied) {
+
+#if 1
+      fit->frac_errs[i]=sqrt(act_dot(tod->ndata,tod->data[i],1,tod->data[i],1)/((actData)tod->ndata))/fit->median_scats[i];
+#else
 #ifdef ACTDATA_DOUBLE
       fit->frac_errs[i]=sqrt(cblas_ddot(tod->ndata,tod->data[i],1,tod->data[i],1)/
                              ((actData)tod->ndata))/fit->median_scats[i];
 #else
       fit->frac_errs[i]=sqrt(cblas_sdot(tod->ndata,tod->data[i],1,tod->data[i],1)/
                              ((actData)tod->ndata))/fit->median_scats[i];
+#endif
 #endif
       continue;
     } else {
@@ -1065,11 +1112,17 @@ void mbCalculateCommonFracErrs(const mbTOD *tod, mbNoiseCommonMode *fit)
       for (int j=0;j<fit->ndata;j++)
         vec[j]=(tod->data[i][j]-vec[j]-fit->median_vals[i]);
 
+
+#if 1
+      fit->frac_errs[i]=sqrt(act_dot(tod->ndata,vec,1,vec,1)/((actData)tod->ndata))/fit->median_scats[i];
+#else
 #ifdef ACTDATA_DOUBLE
       fit->frac_errs[i]=sqrt(cblas_ddot(tod->ndata,vec,1,vec,1)/((actData)tod->ndata))/fit->median_scats[i];
 #else
       fit->frac_errs[i]=sqrt(cblas_sdot(tod->ndata,vec,1,vec,1)/((actData)tod->ndata))/fit->median_scats[i];
 #endif      
+#endif
+      
       psFree(params);
       psFree(vec);
     }
@@ -1337,12 +1390,18 @@ void mbCalculateUnsmoothRatio(mbTOD *tod, mbNoiseCommonMode *fit)
   
 #pragma omp parallel for shared(tod,fit,dataCopy) default (none)
   for (int i=0;i<tod->ndet;i++){
+
+
+#if 1
+    fit->unsmooth_ratio[i]=sqrt(act_dot(tod->ndata,dataCopy[i],1,dataCopy[i],1)/act_dot(tod->ndata,tod->data[i],1,tod->data[i],1));
+#else
 #ifdef ACTDATA_DOUBLE
     fit->unsmooth_ratio[i]=sqrt(cblas_ddot(tod->ndata,dataCopy[i],1,dataCopy[i],1)/
                                 cblas_ddot(tod->ndata,tod->data[i],1,tod->data[i],1));
 #else
     fit->unsmooth_ratio[i]=sqrt(cblas_sdot(tod->ndata,dataCopy[i],1,dataCopy[i],1)/
                                 cblas_sdot(tod->ndata,tod->data[i],1,tod->data[i],1));
+#endif
 #endif
   }
     
@@ -1456,69 +1515,3 @@ void nkCutUncorrDets(mbTOD *tod, mbNoiseCommonMode *fit,actData maxErr)
   
 }
 
-#if 0
-
-    def cutUncorrDets(self, maxErr = 2.0 ):
-        """
-        @brief Cut out detectors that are uncorrelated with most of the array.
-
-        Note that this does not remove the modes from the data.
-        To remove modes use removeCommonMode
-
-        @param maxErr float: increase this parameter to allow more detectors to pass cut
-        """
-
-        tod = self.tod
-        if tod.ndet == 1:
-            psLib.trace( 'moby', 3, \
-              "%s: Need more than one detector in the TOD" % (__name__))
-            return None
-
-        ncut=0
-        if True:
-            errs=numpy.array(self.fracErrs)
-            med_val=numpy.median(errs)
-            errs_abs=numpy.abs(errs-med_val)
-            scat=numpy.median(errs_abs)
-            thresh=med_val+maxErr*scat
-            psLib.trace( 'moby', 3, 'Median frac error and scatter about it are  '+
-                         '%0.4f and %0.4f in common_mode with thresh %0.4f.' % ( med_val,scat,thresh ))
-        else:
-            thresh=maxErr
-
-        for ind in range(0,tod.ndet):
-            if self.fracErrs[ind]>thresh:
-                r=int(tod.rows[ind])
-                c=int(tod.cols[ind])
-                tod.cuts.setAlwaysCut( r,c )
-                psLib.trace( 'moby', 3, 'Cutting detector '+
-                             '%d %d from common modes fit with fractional error %0.4f.' %
-                             (r,c,self.fracErrs[ind] ))
-                ncut=ncut+1
-
-        psLib.trace( 'moby', 3, \
-          'Cutting %d detectors due to being uncorrelated.' % ( ncut ))
-
-        self.tod.abuses += [ { 'name':'cutUncorrDets', 'type':'cut', \
-          'maxErr':maxErr, 'npPoly':self.npPoly, 'npCommon':self.npCommon, \
-          'nsig':self.nsig, 'tGlitch': self.tGlitch, 'tSmooth': self.tSmooth,\
-          'ncut': ncut } ]
-
-
-#endif
-
-
-/*---------------------------------------------------------------------------------------------------------*/
-/// Find any NaN values in a data vector.
-/// \param vec  The data to check.
-/// \param n    Length of vec.
-/// \return index of the first NaN, or -1 if none.
-
-// JWF commented out 23 April 2008, b/c nothing was calling it.
-// static int check_for_nans(const actData *vec, int n)
-// {
-//   for (int i=0;i<n;i++)
-//     if (isnan(vec[i]))
-//       return i;
-//   return -1;
-// }

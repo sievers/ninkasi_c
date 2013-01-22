@@ -29,6 +29,8 @@ void nkAssignNoiseKnee( mbTOD *tod, actData knee);
 void add_noise_to_tod_new(mbTOD *tod);
 void set_tod_noise(mbTOD *tod, actData white, actData knee, actData powlaw);
 
+void apply_real_filter_to_data(mbTOD *tod, actData *filt);
+void apply_complex_filter_to_data(mbTOD *tod, actComplex *filt);
 void nkDeButterworth(mbTOD *tod);
 void nkReButterworth(mbTOD *tod);
 void nkDeconvolveTimeConstants(mbTOD *tod);

@@ -48,7 +48,7 @@ static inline actData sin4(actData x)
 /*--------------------------------------------------------------------------------*/
 
 /*--------------------------------------------------------------------------------*/
-void radecvec2cea_pix(actData *ra, actData *dec, int *rapix, int *decpix, int *ind, int ndata, const MAP *map)
+void radecvec2cea_pix(const actData *ra, const actData *dec, int *rapix, int *decpix, int *ind, int ndata, const MAP *map)
 {
   double rafac=RAD2DEG/map->projection->radelt;  //180/pi since ra is in radians, but CEA FITS likes degrees.                                                                                          
   double decfac=RAD2DEG/map->projection->pv/map->projection->decdelt;
@@ -128,7 +128,25 @@ void get_map_projection_wchecks(const mbTOD *tod, const MAP *map, int det, int *
     memcpy(ind,tod->pixelization_saved[det],sizeof(int)*tod->ndata);
     return;
   }
+
   get_radec_from_altaz_fit_1det_coarse(tod,det,scratch);
+#if 1
+  convert_radec_to_map_pixel(scratch->ra,scratch->dec,ind,tod->ndata,map);
+  if (inbounds) {  //checking map pixellization inboundness
+    for (int i=0;i<tod->ndata;i++) {
+      if ((ind[i]<0)||(ind[i]>=map->npix)) {
+	fprintf(stderr,"We are going to have a problem at ra/dec %14.6f %14.6f mapped to pixel %d\n",scratch->ra[i],scratch->dec[i],ind[i]);
+	inbounds[i]=false;
+      }
+      else
+	inbounds[i]=true;
+    }
+  }
+  
+  return;
+#endif
+  //printf("using old code.\n");
+
   //printf("back from get_radec_from_altaz_fit_1det_coarse.\n");
   switch(map->projection->proj_type) {
   case(NK_RECT): 
@@ -317,7 +335,7 @@ void radec2xy_tan_raw(actData *x, actData *y, actData ra, actData dec, actData r
 
 }
 /*--------------------------------------------------------------------------------*/
-void radec2xy_tan(actData *x, actData *y,actData ra, actData dec, nkProjection *proj)
+void radec2xy_tan(actData *x, actData *y,actData ra, actData dec, const nkProjection *proj)
 {
   //printf("hello!\n");
   radec2xy_tan_raw(x,y,ra,dec,proj->ra_cent,proj->dec_cent);
@@ -646,4 +664,70 @@ MAP *extract_subregion_map_cea(MAP *map, actData ramin, actData ramax, actData d
     
   }
 #endif
+}
+
+/*--------------------------------------------------------------------------------*/
+void convert_radec_to_map_pixel(const actData *ra, const actData *dec, int *ind, long ndata, const MAP *map)
+{
+  const nkProjection *proj=map->projection;
+  switch(proj->proj_type) {
+  case(NK_RECT): 
+    //printf("Doing rectangular projection.\n");
+    for (long i=0;i<ndata;i++)
+      ind[i]=(int)((dec[i]-map->decmin)/map->pixsize)+map->ny*(int)((ra[i]-map->ramin)/map->pixsize);    
+    break;
+  case(NK_TAN):
+    {
+      actData x,y;
+      for (long i=0;i<ndata;i++) {
+        radec2xy_tan(&x,&y,ra[i],dec[i],proj);
+        ind[i]=(int)(x+0.5)+map->nx*((int)(y+0.5));
+      }
+    }
+    break;
+#ifdef USE_HEALPIX
+  case(NK_HEALPIX_RING):
+    for (int i=0;i<ndata;i++) {
+      ang2pix_ring(map->projection->nside,PI_OVER_TWO-dec[i],ra[i],&ind[i]);
+    }
+    break;
+  case(NK_HEALPIX_NEST):
+    for (int i=0;i<ndata;i++) {
+      ang2pix_nest(map->projection->nside,PI_OVER_TWO-dec[i],ra[i],&ind[i]); 
+    }
+    break;
+#endif
+  case (NK_CEA):
+    radecvec2cea_pix(ra,dec, NULL,NULL,ind,ndata,map);
+    break;
+  default:
+    printf("Unknown type in convert_radec_to_map_pixel.\n");
+    assert(1==0);
+    break;
+  }
+  
+}
+
+/*--------------------------------------------------------------------------------*/
+void convert_saved_pointing_to_pixellization(mbTOD *tod, MAP *map)
+//convert the ra/dec saved in a TOD to a map pixellization.  Free the RA/Dec.
+{
+  if ((!tod->ra_saved) ||(!tod->dec_saved)) {
+    fprintf(stderr,"Missing ra/dec in TOD in convert_saved_pointing_to_pixellization.\n");
+    return;
+  }
+  if (!tod->pixelization_saved)
+    tod->pixelization_saved=imatrix(tod->ndet,tod->ndata);
+#pragma omp parallel for shared(tod,map) default(none)
+  for (int i=0;i<tod->ndet;i++)
+    convert_radec_to_map_pixel(tod->ra_saved[i],tod->dec_saved[i],tod->pixelization_saved[i],tod->ndata,map);
+  
+  free(tod->ra_saved[0]);
+  free(tod->ra_saved);
+  tod->ra_saved=NULL;
+
+  free(tod->dec_saved[0]);
+  free(tod->dec_saved);
+  tod->dec_saved=NULL;
+  
 }

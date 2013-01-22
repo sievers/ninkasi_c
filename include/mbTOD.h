@@ -78,8 +78,11 @@ typedef struct {
 #ifdef ACTPOL
 typedef struct {
   int nhorn;
+
   actData *dx;
   actData *dy;
+  actData *theta;
+  actData freq;
   ACTpolArray *array;
   actData alt0;
   actData az0;
@@ -154,7 +157,7 @@ typedef struct {
   bool point_absent;   //!< Are the az/alt encoder channels absent from the raw data?
   psS32 *tv_sec;       //!< time (seconds since Unix Epoch)
   psS32 *tv_usec;      //!< time (microseconds since second; 0 <= tv_usec < 1e6)
-  float *dt;           //!< time (seconds since the start of the scan)
+  double *dt;           //!< time (seconds since the start of the scan) 
   float sampleTime;    //!< time (seconds since the start of the scan)
   actData *az;           //!< azimuth of boresight; radians
   actData *alt;          //!< altitude of boresight; radians
@@ -233,7 +236,8 @@ typedef struct {
   //ACTpolArray *polarray;
   //ACTpolWeather weather;  //if there's TOD-based weather info.
   ACTpolPointingFit *actpol_pointing;
-  actData *hpw;
+  actData *hwp;
+  actData **twogamma_saved;
 #endif
 
   PointingFit *pointing_fit;  //pointing fit, turn alt/az into ra/dec

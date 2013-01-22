@@ -52,6 +52,7 @@ actData mygasdev(unsigned *seed);
 actData myrand(unsigned *seed);
 
 void act_gemm(char transa, char transb, int m, int n, int k, actData alpha, actData *a, int lda, actData *b, int ldb, actData beta, actData *c, int ldc);
+actData act_dot(int n, actData *x, int incx, actData *y, int incy);
 
 actData *legendre_fit(actData *data, int ndata, int ord);
 actData **legendre_mat(int ndata, int ord);

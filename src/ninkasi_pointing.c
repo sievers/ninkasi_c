@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
+#include <omp.h>
 
 #include "ninkasi.h"
 #include "ninkasi_mathutils.h"
@@ -1296,8 +1297,41 @@ ACTpolPointingFit *initialize_actpol_pointing(mbTOD *tod, actData *dx, actData *
   ACTpolPointingFit *fit=(ACTpolPointingFit *)calloc(1,sizeof(ACTpolPointingFit));
   int nhorns=tod->ndet;
   ACTpolArray *array = ACTpolArray_alloc(nhorns);
+  fit->array=array;
 
+  fit->dx=vector(tod->ndet);
+  fit->dy=vector(tod->ndet);
+  fit->theta=vector(tod->ndet);
+  tod->actpol_pointing=fit;
+  return update_actpol_pointing(tod,dx,dy,angle,freq,dpiv);
+}
+#endif
+/*--------------------------------------------------------------------------------*/
+#ifdef ACTPOL
+ACTpolPointingFit *update_actpol_pointing(mbTOD *tod, actData *dx, actData *dy, actData *angle, actData freq,int dpiv)
+{
+  assert(tod->actpol_pointing);
+  ACTpolPointingFit *fit=tod->actpol_pointing;
+  int nhorns=tod->ndet;
 
+  //ACTpolArray *array = ACTpolArray_alloc(nhorns);
+  ACTpolArray *array = fit->array;
+  
+  //fit->dx=vector(tod->ndet);
+  //fit->dy=vector(tod->ndet);
+  //fit->theta=vector(tod->ndet);
+  
+  memcpy(fit->dx,dx,tod->ndet*sizeof(actData));
+  memcpy(fit->dy,dy,tod->ndet*sizeof(actData));
+  if (angle)
+    memcpy(fit->theta,angle,tod->ndet*sizeof(actData));
+  else
+    memset(fit->theta,0,tod->ndet*sizeof(actData));
+
+  //for (int i=0;i<tod->ndet;i++)
+  //  printf("Detector %d: %14.6f %14.6f %14.6f\n",i,fit->dx[i]*180/3.14159265,fit->dy[i]*180/3.14159265,fit->theta[i]*180/3.14159265);
+
+  
   actData xtot=0,ytot=0;
   for (int i=0;i<nhorns;i++){
     xtot+=dx[i];
@@ -1313,7 +1347,7 @@ ACTpolPointingFit *initialize_actpol_pointing(mbTOD *tod, actData *dx, actData *
       ACTpolFeedhorn_init(array->horn+i, dx[i], dy[i],0);
   }
   
-  fit->array=array;
+  //fit->array=array;
 
   double azmin,azmax,altmin,altmax;
   azmin=tod->az[0];
@@ -1347,6 +1381,8 @@ ACTpolPointingFit *initialize_actpol_pointing(mbTOD *tod, actData *dx, actData *
   if (ipiv[npiv-1]>=tod->ndata)
     ipiv[npiv-1]=tod->ndata-1;
   //printf("Final pivot is %d %d %d\n",npiv,ipiv[npiv-1],tod->ndata);
+  if (fit->ipiv)
+    free(fit->ipiv);
   fit->ipiv=ipiv;
   fit->npiv=npiv;
   fit->dpiv=dpiv;
@@ -1358,6 +1394,111 @@ ACTpolPointingFit *initialize_actpol_pointing(mbTOD *tod, actData *dx, actData *
   
 }
 #endif
+
+/*--------------------------------------------------------------------------------*/
+#ifdef ACTPOL
+void precalc_actpol_pointing_exact(mbTOD *tod)
+{
+  assert(tod);
+  if (!tod->actpol_pointing) {
+    fprintf(stderr,"Error in precalc_actpol_exact.  Please call initialize_actpol_pointing first before trying to use this routine.\n");
+    return;
+  }
+
+  bool is_pointing_needed=false;
+
+
+  if (tod->ra_saved) 
+    fprintf(stderr,"RA is already cached in precalc_actpol_exact.\n");
+  else {
+    is_pointing_needed=true;
+    tod->ra_saved=matrix(tod->ndet,tod->ndata);    
+  }
+  if (tod->dec_saved) 
+    fprintf(stderr,"Dec is already cached in precalc_actpol_exact.\n");
+  else {
+    is_pointing_needed=true;
+    tod->dec_saved=matrix(tod->ndet,tod->ndata);    
+  }
+  if (tod->twogamma_saved) 
+    fprintf(stderr,"2*gamma is already cached in precalc_actpol_exact.\n");
+  else {
+    is_pointing_needed=true;
+    tod->twogamma_saved=matrix(tod->ndet,tod->ndata);    
+  }
+  if (!is_pointing_needed) {
+    fprintf(stderr,"Pointing appears to be fully cached.  Returning.  If you really wanted to recalculate pointing, call free_tod_pointing_saved first.\n");
+    printf("tod->ra_saved is %ld, tod->dec_saved is %ld\n",(long)(&(tod->ra_saved))-(long)tod,(long)(&(tod->dec_saved))-(long)tod);
+    
+    return;
+  }
+#pragma omp parallel shared(tod) default(none)
+  {
+    const bool do_hwp=(tod->hwp!=NULL);  //maybe declaring this const will let HWP adjustment happen quickly
+    
+    ACTpolArray *array = ACTpolArray_alloc(tod->ndet);
+    double xcent=0.0;
+    double ycent=0.0;
+
+    ACTpolArray_init(array, tod->actpol_pointing->freq, xcent,ycent);
+    for (int i=0;i<tod->ndet;i++) {
+      ACTpolFeedhorn_init(&(array->horn[i]),tod->actpol_pointing->dx[i],tod->actpol_pointing->dy[i],tod->actpol_pointing->theta[i]);
+    }
+    ACTpolWeather weather;
+    ACTpolWeather_default(&weather);
+    
+    ACTpolArrayCoords *coords = ACTpolArrayCoords_alloc(array);
+    ACTpolArrayCoords_init(coords);
+
+    ACTpolState *state = ACTpolState_alloc();
+    ACTpolState_init(state);
+
+    ACTpolScan scan;
+    ACTpolScan_init(&scan, tod->actpol_pointing->alt0,tod->actpol_pointing->az0,tod->actpol_pointing->az_throw);
+
+    ACTpolArrayCoords_update_refraction(coords, &scan, &weather);
+    
+#pragma omp for
+    for (int i=0;i<tod->ndata;i++) {
+      actData myctime;
+      if (tod->dt)
+	myctime=tod->dt[i];
+      else
+	myctime=tod->ctime+tod->deltat*(actData)i;
+      
+      ACTpolState_update(state,myctime,tod->alt[i],tod->az[i]);
+      ACTpolArrayCoords_update(coords, state);
+      for (int j=0;j<tod->ndet;j++) {
+        ACTpolFeedhornCoords *fc = &(coords->horn[j]);
+	tod->ra_saved[j][i]=fc->ra;
+	tod->dec_saved[j][i]=fc->dec;
+	tod->twogamma_saved[j][i]=atan2(fc->sin2gamma,fc->cos2gamma);
+	if (do_hwp)
+	  tod->twogamma_saved[j][i]+=4*tod->hwp[i];
+	
+      }
+    }
+#if 0
+    for (int i=0;i<tod->ndet;i++) {
+      actData ratot=0;
+      actData dectot=0;
+      for (int j=0;j<tod->ndata;j++) {
+	ratot+=tod->ra_saved[i][j];
+	dectot+=tod->dec_saved[i][j];
+      }
+      printf("detector %d has average positions %12.5f %12.5f\n",i,ratot/tod->ndata,dectot/tod->ndata);
+    }
+#endif
+    ACTpolState_free(state);
+    ACTpolArrayCoords_free(coords);
+    ACTpolArray_free(array);
+    
+  }
+  
+  
+}
+#endif
+
 /*--------------------------------------------------------------------------------*/
 #ifdef ACTPOL
 void precalc_actpol_pointing(mbTOD *tod)
@@ -1472,3 +1613,58 @@ void get_radec_one_det_actpol(mbTOD *tod,int det,PointingFitScratch *scratch)
 
 #endif
 /*--------------------------------------------------------------------------------*/
+#ifdef ACTPOL
+void get_radec_from_altaz_actpol_c(double *az, double *el, double *tvec, double *dx, double *dy, double *theta, double *ra, double *dec, int nhorns, int nt)
+{
+  double azmin=az[0];
+  double azmax=az[0];
+  for (int i=1;i<nt;i++) {
+    if (az[i]<azmin)
+      azmin=az[i];
+    if (az[i]>azmax)
+      azmax=az[i];
+  }
+  double az_cent=0.5*(azmin+azmax);
+  double az_throw=0.5*(azmax-azmin);
+  //#pragma omp parallel shared(az,el,tvec,dx,dy,theta,ra,dec,nhorns,nt,az_cent,az_throw) default(none)
+  {
+    printf("running with %d threads\n",omp_get_num_threads());
+    ACTpolArray *array = ACTpolArray_alloc(nhorns);
+    double xcent=0.0;
+    double ycent=0.0;
+    double freq=148.0;
+    ACTpolArray_init(array, freq, xcent,ycent);
+    for (int i=0;i<nhorns;i++) {
+      ACTpolFeedhorn_init(&(array->horn[i]),dx[i],dy[i],theta[i]);
+    }
+    ACTpolWeather weather;
+    ACTpolWeather_default(&weather);
+
+
+    ACTpolArrayCoords *coords = ACTpolArrayCoords_alloc(array);
+    ACTpolArrayCoords_init(coords);
+
+    ACTpolState *state = ACTpolState_alloc();
+    ACTpolState_init(state);
+    
+    ACTpolScan scan;
+    ACTpolScan_init(&scan, el[0], az_cent,az_throw);
+    ACTpolArrayCoords_update_refraction(coords, &scan, &weather);
+    printf("starting loop.\n");
+    //#pragma omp for
+    for (int i=0;i<nt;i++) {
+      ACTpolState_update(state, tvec[i],el[i],az[i]);
+      ACTpolArrayCoords_update(coords, state);
+      for (int j=0;j<nhorns;j++) {
+        ACTpolFeedhornCoords *fc = &(coords->horn[j]);
+	ra[i*nhorns+j]=fc->ra;
+        dec[i*nhorns+j]=fc->dec;
+        //sin2gamma[i+j*nelem]=fc->sin2gamma;
+        //cos2gamma[i+j*nelem]=fc->cos2gamma;
+      }      
+    }
+    printf("ending loop.\n");
+    
+  }
+}
+#endif
