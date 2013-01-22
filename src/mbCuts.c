@@ -69,7 +69,7 @@ int mbCutsRead(mbCuts *c, const char *filename)
 
   FILE *f;
   int nrow, ncol;
-  int MAX_LINE = 20000; // global cut could be v. long with turnaround cuts
+  int MAX_LINE = 200000; // global cut could be v. long with turnaround cuts
   char line[MAX_LINE];
   int first, last;
   int nread = 0;
