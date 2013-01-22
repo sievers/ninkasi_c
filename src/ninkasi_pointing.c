@@ -1297,16 +1297,40 @@ ACTpolPointingFit *initialize_actpol_pointing(mbTOD *tod, actData *dx, actData *
   ACTpolPointingFit *fit=(ACTpolPointingFit *)calloc(1,sizeof(ACTpolPointingFit));
   int nhorns=tod->ndet;
   ACTpolArray *array = ACTpolArray_alloc(nhorns);
+  fit->array=array;
 
   fit->dx=vector(tod->ndet);
   fit->dy=vector(tod->ndet);
   fit->theta=vector(tod->ndet);
+  tod->actpol_pointing=fit;
+  return update_actpol_pointing(tod,dx,dy,angle,freq,dpiv);
+}
+#endif
+/*--------------------------------------------------------------------------------*/
+#ifdef ACTPOL
+ACTpolPointingFit *update_actpol_pointing(mbTOD *tod, actData *dx, actData *dy, actData *angle, actData freq,int dpiv)
+{
+  assert(tod->actpol_pointing);
+  ACTpolPointingFit *fit=tod->actpol_pointing;
+  int nhorns=tod->ndet;
+
+  //ACTpolArray *array = ACTpolArray_alloc(nhorns);
+  ACTpolArray *array = fit->array;
+  
+  //fit->dx=vector(tod->ndet);
+  //fit->dy=vector(tod->ndet);
+  //fit->theta=vector(tod->ndet);
+  
   memcpy(fit->dx,dx,tod->ndet*sizeof(actData));
   memcpy(fit->dy,dy,tod->ndet*sizeof(actData));
   if (angle)
     memcpy(fit->theta,angle,tod->ndet*sizeof(actData));
   else
     memset(fit->theta,0,tod->ndet*sizeof(actData));
+
+  //for (int i=0;i<tod->ndet;i++)
+  //  printf("Detector %d: %14.6f %14.6f %14.6f\n",i,fit->dx[i]*180/3.14159265,fit->dy[i]*180/3.14159265,fit->theta[i]*180/3.14159265);
+
   
   actData xtot=0,ytot=0;
   for (int i=0;i<nhorns;i++){
@@ -1323,7 +1347,7 @@ ACTpolPointingFit *initialize_actpol_pointing(mbTOD *tod, actData *dx, actData *
       ACTpolFeedhorn_init(array->horn+i, dx[i], dy[i],0);
   }
   
-  fit->array=array;
+  //fit->array=array;
 
   double azmin,azmax,altmin,altmax;
   azmin=tod->az[0];
@@ -1357,6 +1381,8 @@ ACTpolPointingFit *initialize_actpol_pointing(mbTOD *tod, actData *dx, actData *
   if (ipiv[npiv-1]>=tod->ndata)
     ipiv[npiv-1]=tod->ndata-1;
   //printf("Final pivot is %d %d %d\n",npiv,ipiv[npiv-1],tod->ndata);
+  if (fit->ipiv)
+    free(fit->ipiv);
   fit->ipiv=ipiv;
   fit->npiv=npiv;
   fit->dpiv=dpiv;
@@ -1452,7 +1478,17 @@ void precalc_actpol_pointing_exact(mbTOD *tod)
 	
       }
     }
-
+#if 0
+    for (int i=0;i<tod->ndet;i++) {
+      actData ratot=0;
+      actData dectot=0;
+      for (int j=0;j<tod->ndata;j++) {
+	ratot+=tod->ra_saved[i][j];
+	dectot+=tod->dec_saved[i][j];
+      }
+      printf("detector %d has average positions %12.5f %12.5f\n",i,ratot/tod->ndata,dectot/tod->ndata);
+    }
+#endif
     ACTpolState_free(state);
     ACTpolArrayCoords_free(coords);
     ACTpolArray_free(array);
