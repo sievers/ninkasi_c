@@ -85,7 +85,7 @@ int mbCutsRead(mbCuts *c, const char *filename)
   nread++;
   if ( c->nrow != nrow || c->ncol != ncol ){
     //psTrace("moby", 2, "nrow and ncol in %s does not fit cuts object", filename);
-    fprintf(stderr,"nrow and ncol in %s does not fit cuts object", filename);
+    fprintf(stderr,"nrow and ncol in %s does not fit cuts object\n", filename);
     return nread;
   }
 
@@ -114,10 +114,10 @@ int mbCutsRead(mbCuts *c, const char *filename)
     char *tok = NULL;
     int nnread = 0;
     int row, col;
-
+    printf("starting per-detector cuts.\n");
     while( fgets( line, MAX_LINE, f ) != NULL ) {
       nnread = sscanf( line, "r%dc%d: ", &row, &col );
-      //printf("parsing %d %d\n",row,col);
+      printf("parsing %d %d\n",row,col);
       if (nnread != 2) {
         psTrace( "moby", 3, "Bad cutfile format : %s :\n%s\n",
                  filename, line );
@@ -139,8 +139,8 @@ int mbCutsRead(mbCuts *c, const char *filename)
       }
     }
   }
-
   fclose(f);
+  printf("finished cuts read.\n");
   return nread;
 }
 /*--------------------------------------------------------------------------------*/

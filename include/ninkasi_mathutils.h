@@ -36,6 +36,10 @@ void eval_2d_poly_inplace(actData *x, actData *y, int n, PolyParams2d *fit, actD
 void eval_2d_poly_pair_inplace(actData *x, actData *y, int n,const  PolyParams2d *fit, actData *d, const PolyParams2d *fit2, actData *d2);
 actData *eval_2d_poly(actData *x, actData *y, int n, PolyParams2d *fit);
 
+
+void linfit_many_vecs(actData **d, actData **vecs, int n, int ncol, int np, actData **fitp);
+
+
 void add_outer_product(actData *col, int ncol, actData *row, int nrow, actData **mat);
 
 actData vecmin(actData *vec, int n);
@@ -52,6 +56,7 @@ actData mygasdev(unsigned *seed);
 actData myrand(unsigned *seed);
 
 void act_gemm(char transa, char transb, int m, int n, int k, actData alpha, actData *a, int lda, actData *b, int ldb, actData beta, actData *c, int ldc);
+//void act_syrk(char uplo, char trans, int n, int k, actData alpha, actData *a, int lda, actData beta, actData *c, int ldc);
 actData act_dot(int n, actData *x, int incx, actData *y, int incy);
 
 actData *legendre_fit(actData *data, int ndata, int ord);

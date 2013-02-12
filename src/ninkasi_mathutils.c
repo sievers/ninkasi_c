@@ -19,6 +19,11 @@
 void dgemm_(char *TRANSA, char *TRANSB, int *M, int *N, int *K, double *ALPHA, double *A, int *LDA, double *B, int *LDB, double  *beta, double *C, int *LDC, int transalen, int transblen );
 void sgemm_(char *TRANSA, char *TRANSB, int *M, int *N, int *K, float *ALPHA, float *A, int *LDA, float *B, int *LDB, float *beta, float *C, int *LDC, int transalen, int transblen );
 
+void dsyrk_(char *uplo, char *trans, int *n, int *k, double *alpha, double *a, int *lda, double *beta, double *c, int *ldc);
+void ssyrk_(char *uplo, char *trans, int *n, int *k, float *alpha, float *a, int *lda, float *beta, float *c, int *ldc);
+
+void act_syrk(char uplo, char trans, int n, int m, actData alpha, actData *a, int lda, actData beta, actData *b, int ldb);
+
 /*--------------------------------------------------------------------------------*/
 
 #define SSWAP(a,b) temp=(a);(a)=(b);(b)=temp;
@@ -126,6 +131,44 @@ void add_outer_product(actData *col, int ncol, actData *row, int nrow, actData *
       mat[i][j]+=col[i]*row[j];
 }
 
+/*--------------------------------------------------------------------------------*/
+void linfit_many_vecs(actData **d, actData **vecs, int n, int ncol, int np, actData **fitp)
+//fit a set of vectors *without errors* to many columns of data simultaneously
+{
+  actData **ata=matrix(np,np);
+  actData **atd=matrix(ncol,np);
+
+  //printf("initially, ata/atd are %ld %ld, %ld %ld\n",(long)ata[0],(long)ata,(long)fitp[0],(long)fitp);
+  
+
+  // Make A^T*A
+  act_syrk('u','n',np,n,1.0,vecs[0],np,0.0,ata[0],np);
+  for (int i=0;i<np;i++)
+    for (int j=i+1;j<np;j++)
+      ata[i][j]=ata[j][i];
+
+  //printf("ata block is:\n %16.6e %16.6e %16.6e\n %16.6e %16.6e %16.6e\n %16.6e %16.6e %16.6e\n",ata[0][0],ata[0][1],ata[0][2],ata[1][0],ata[1][1],ata[1][2],ata[2][0],ata[2][1],ata[2][2]);
+
+  // make A^Td 
+  act_gemm('n','n',np,ncol,n,1.0,vecs[0],np,d[0],n,0.0,atd[0],np);
+  //invert A^T A
+  invert_posdef_mat(ata,np);
+  //printf("ata inverse block is:\n %16.6e %16.6e %16.6e\n %16.6e %16.6e %16.6e\n %16.6e %16.6e %16.6e\n",ata[0][0],ata[0][1],ata[0][2],ata[1][0],ata[1][1],ata[1][2],ata[2][0],ata[2][1],ata[2][2]);
+
+  //now multiply for fit params, ata_inv is (np,np) atd is (ncol,np), fitp is (ncol,np)
+
+  //printf("doing final gemm\n");
+  //printf("intermediately, ata/atd are %ld %ld, %ld %ld\n",(long)ata[0],(long)ata,(long)fitp[0],(long)fitp);
+  act_gemm('n','n',np,ncol,np,1.0,ata[0],np,atd[0],np,0.0,fitp[0],np);
+
+  //printf("finally, ata/atd are %ld %ld, %ld %ld\n",(long)ata[0],(long)ata,(long)fitp[0],(long)fitp);
+  //printf("freeing.\n");
+  free(ata[0]);
+  free(ata);
+  free(atd[0]);
+  free(atd);
+  //printf("freed.\n");
+}
 /*--------------------------------------------------------------------------------*/
 actData *linfit(actData *d, double **vecs, actData *errs,  int n, int np)
 //return best-fit parameters of d from vecs, with errors errs.  length of d is n, 
@@ -415,6 +458,17 @@ void act_gemm(char transa, char transb, int m, int n, int k, actData alpha, actD
 #endif
 
 }
+/*--------------------------------------------------------------------------------*/
+#if 0 //defined in ninkasi_noise.c
+void act_syrk(char uplo, char trans, int n, int k, actData alpha, actData *a, int lda, actData beta, actData *c, int ldc)
+{
+#ifdef ACTDATA_DOUBLE
+  dsyrk_(&uplo,&trans,&n,&k,&alpha,a,&lda,&beta,c,&ldc);
+#else
+  ssyrk_(&uplo,&trans,&n,&k,&alpha,a,&lda,&beta,c,&ldc);
+#endif
+}
+#endif
 /*--------------------------------------------------------------------------------*/
 actData act_dot(int n, actData *x, int incx, actData *y, int incy)
 {

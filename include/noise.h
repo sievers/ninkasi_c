@@ -8,6 +8,9 @@
 #define MB_WRITE_NOISE 1
 #include "noise_types.h"
 
+void act_syrk(char uplo, char trans, int n, int m, actData alpha, actData *a, int lda, actData beta, actData *b, int ldb);
+
+
 int nkFitNoise1Det(NoiseParams1Pix *noise,mbTOD *tod,int mydet);
 int nkFitNoise_LinearPowlaw(NoiseParams1Pix *noise,mbTOD *tod,int mydet);
 void SubtractMedian(actData *vec, int n);
@@ -67,5 +70,13 @@ void set_noise_powlaw(mbTOD *tod, actData *amps, actData *knees, actData *pows);
 
 void simple_test_diag_proj_noise_inv(actData **data_in, actData **data_out, actData *noise, actData **vecs, int ndata, int ndet, int nvecs);
 void apply_diag_proj_noise_inv_bands(actData **data_in, actData **data_out, actData *noise, actData **vecs, int ndata, int ndet, int nvecs, int imin, int imax);
+
+void fill_sin_cos_mat(actData *theta, int ndata, int nterm, actData **mat);
+void fill_tod_sin_cos_vec(mbTOD *tod, int nterm, actData *vec);
+void fit_hwp_poly_to_data(mbTOD *tod, int nsin, int npoly, actData **fitp, actData **vecs);
+void remove_hwp_poly_from_data(mbTOD *tod, int nsin, int npoly);
+int get_demodulated_hwp_data(mbTOD *tod, actData hwp_freq, actComplex **tdata,actComplex **poldata);
+
+
 
 #endif
