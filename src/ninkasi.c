@@ -1378,7 +1378,7 @@ MAP *make_map_copy(MAP *map)
   map_copy->projection=(nkProjection *)malloc_retry(sizeof(nkProjection));
   memcpy(map_copy->projection,map->projection,sizeof(nkProjection));
   map_copy->have_locks=0;  //don't recycle locks.  will create them as needed, if needed.
-  map_copy->map=(actData *)malloc_retry(sizeof(actData)*map_copy->npix);
+  map_copy->map=(actData *)malloc_retry(sizeof(actData)*map_copy->npix*get_npol_in_map(map));
 #ifdef ACTPOL
   memcpy(map_copy->pol_state,map->pol_state,MAX_NPOL*sizeof(map->pol_state[0]));
 #endif
@@ -2043,18 +2043,18 @@ void tod2map(MAP *map, mbTOD *tod, PARAMS *params)
 
 
   int nproc;
-  printf("projecting TOD into map.\n");
+  //printf("projecting TOD into map.\n");
 #pragma omp parallel shared(nproc) default(none)
 #pragma omp single
   nproc=omp_get_num_threads();
   
   if (nproc*map->npix*sizeof(actData)>tod->ndata*tod->ndet*sizeof(int)) {
-    printf("doing index-saving projection.\n");
+    //printf("doing index-saving projection.\n");
     tod2map_nocopy(map,tod,params);
     return;
   }
   //else
-  printf("doing old projection.\n");
+  //printf("doing old projection.\n");
 
 
 
@@ -2165,20 +2165,22 @@ void tod2polmap(MAP *map,mbTOD *tod)
   assert(tod);
   assert(tod->data);
   assert(tod->pixelization_saved);
+  assert(tod->uncuts);
   int cur_pol=0;
   //loop through possible polarization states and project the ones we find.
   for (int pol_ind=0;pol_ind<MAX_NPOL;pol_ind++)
     if (map->pol_state[pol_ind]) {
       if (pol_ind==0) {  //I 
-#pragma omp parallel shared(pol_ind,map,tod,cur_pol)
+#pragma omp parallel for shared(pol_ind,map,tod,cur_pol)
 	for (int det=0;det<tod->ndet;det++) {
 	  int row=tod->rows[det];
 	  int col=tod->cols[det];
 	  mbUncut *uncut=tod->uncuts[row][col];
-	  for (int region=0;region<uncut->nregions;region++)
+	  for (int region=0;region<uncut->nregions;region++) {
 	    for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++)
 #pragma omp atomic
 	      map->map[tod->pixelization_saved[det][j]]+=tod->data[det][j];
+	  }
 	}
 	cur_pol++;
       }

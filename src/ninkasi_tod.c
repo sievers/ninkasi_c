@@ -128,6 +128,18 @@ actData *calculate_glitch_filterC(const actData t_glitch, const actData t_smooth
 
 void filter_whole_tod(mbTOD *tod, const actData *filt, actData **to_filt_in)
 {
+
+#if 1  //use this to avoid problems below wherein it seems that some stuff is incompatible with also using fft_all_data with MKL ffts
+  if (to_filt_in==NULL) {
+    apply_real_filter_to_data(tod,filt);
+#pragma omp parallel for shared(tod) default(none)
+    for (int i=0;i<tod->ndet;i++)
+      for (int j=0;j<tod->ndata;j++)
+	tod->data[i][j]*=tod->ndata;
+    return;
+  }
+#endif
+
   actData **to_filt;    // The list of vectors to filter.
   if (to_filt_in==NULL)
     to_filt=tod->data;
