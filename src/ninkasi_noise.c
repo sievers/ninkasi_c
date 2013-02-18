@@ -2217,25 +2217,25 @@ int get_demodulated_hwp_data(mbTOD *tod, actData hwp_freq, actComplex **tdata,ac
       //memset(ctmp,0,nmode*sizeof(actComplex));  //do a highpass.  Could have a bandpass as well.
       fftw_execute_dft_c2r(plan_c2r,ctmp,tmp);
       //memcpy(tod->data[det],tmp,sizeof(actData)*tod->ndata);
-      
+      actData norm_fac=1.0/tod->ndata;
       if (tod->twogamma_saved) {
 	if (det==0)
 	  printf("found twogamma.\n");
 	for (int i=0;i<tod->ndata;i++) {
-	  ctmp[i]=cexp(I*(4*tod->hwp[i]+tod->twogamma_saved[det][i]))*tmp[i];  //demodulated complex timestream
+	  ctmp[i]=cexp(I*(4*tod->hwp[i]+tod->twogamma_saved[det][i]))*tmp[i]*norm_fac;  //demodulated complex timestream
 	}
       }
       else {
 	if (det==0)
 	  printf("twogamma is not here.\n");
 	for (int i=0;i<tod->ndata;i++) {
-	  ctmp[i]=cexp(I*(4*tod->hwp[i]))*tmp[i];  //demodulated complex timestream ignoring detector angles
+	  ctmp[i]=cexp(I*(4*tod->hwp[i]))*tmp[i]*norm_fac;  //demodulated complex timestream ignoring detector angles
 	  
 	  //ctmp[i]=cexp(1.0*(4*tod->hwp[i]+tod->twogamma_saved[det][i]))*tmp[i];  //testing only
 	  //ctmp[i]=tmp[i]+0*I; //testing only
 	}
       }
-      //printf("demodulated second element on %2d is %15.7e %15.7e\n",det,creal(ctmp[1])/tod->ndata,cimag(ctmp[1])/tod->ndata);
+      printf("demodulated second element on %2d is %15.7e %15.7e from %15.7e %12.5f\n",det,creal(ctmp[1])/tod->ndata,cimag(ctmp[1])/tod->ndata,tmp[1],tod->hwp[1]);
       fftw_execute_dft(plan_c2c,ctmp,ctmp2);
       //printf("demodulated second elements on %2d are %15.7e %15.7e, %15.7e %15.7e\n",det,creal(ctmp2[1])/tod->ndata,cimag(ctmp2[1])/tod->ndata,creal(ctmp2[tod->ndata-2])/tod->ndata,cimag(ctmp2[tod->ndata-2])/tod->ndata);
       if (det==-1) {
@@ -2270,5 +2270,243 @@ int get_demodulated_hwp_data(mbTOD *tod, actData hwp_freq, actComplex **tdata,ac
   
   //actComplex **dataft=fft_all_data(tod);
   return 0;
+  
+}
+/*--------------------------------------------------------------------------------*/
+int remodulate_hwp_data(mbTOD *tod, actData hwp_freq, actComplex **tdata,actComplex **poldata)
+//get low-frequency intensity data, put it in tdata, then demodulate, and put the low-frequency data from there in poldata
+//if tdata/poldata are NULL, then return the # of frequencies expected
+{
+  actData dnu=1.0/(tod->deltat*tod->ndata);
+  int nmode=hwp_freq/dnu;
+  //printf("nmode is %d, dnu is %12.4f\n",nmode,dnu);
+  if ((tdata==NULL)||(poldata==NULL))
+    return nmode;
+
+  fftw_plan_with_nthreads(1);
+
+
+
+  double *tmp=(double *)fftw_malloc(tod->ndata*sizeof(double));
+  actComplex *ctmp=(actComplex *)fftw_malloc(tod->ndata*sizeof(actComplex));
+  actComplex *ctmp2=(actComplex *)fftw_malloc(tod->ndata*sizeof(actComplex));
+  fftw_plan plan_r2c=fftw_plan_dft_r2c_1d(tod->ndata,tmp,ctmp,FFTW_ESTIMATE);
+  fftw_plan plan_c2r=fftw_plan_dft_c2r_1d(tod->ndata,ctmp,tmp,FFTW_ESTIMATE);
+  fftw_plan plan_c2c=fftw_plan_dft_1d(tod->ndata,ctmp,ctmp2,FFTW_BACKWARD,FFTW_ESTIMATE);
+
+  fftw_free(tmp);
+  fftw_free(ctmp);
+  fftw_free(ctmp2);
+
+#pragma omp parallel shared(tod,hwp_freq,tdata,poldata,nmode,plan_r2c,plan_c2r,plan_c2c) default(none)
+  {
+    double *tmp=(double *)fftw_malloc(tod->ndata*sizeof(double));
+    actComplex *ctmp=(actComplex *)fftw_malloc(tod->ndata*sizeof(actComplex));
+    actComplex *ctmp2=(actComplex *)fftw_malloc(tod->ndata*sizeof(actComplex));
+    int nelem=fft_real2complex_nelem(tod->ndata);
+#pragma omp for
+    for (int det=0;det<tod->ndet;det++) {
+      memset(ctmp2,0,sizeof(tod->ndata*sizeof(actComplex)));
+      memcpy(ctmp2,poldata[det],nmode*sizeof(actComplex));
+      memcpy(ctmp2+tod->ndata-nmode+1,poldata[det]+nmode,(nmode-1)*sizeof(actComplex));
+      fftw_execute_dft(plan_c2c,ctmp2,ctmp);
+      actData norm_fac=1.0/tod->ndata;      
+
+      if (tod->twogamma_saved) {
+	if (det==0)
+	  printf("found twogamma.\n");
+	actData real_tot=0;
+	actData imag_tot=0;
+	for (int i=0;i<tod->ndata;i++) {
+	  actComplex val=cexp(I*(-4*tod->hwp[i]-tod->twogamma_saved[det][i]))*ctmp[i];
+	  tmp[i]=creal(val);
+	  real_tot+=fabs(tmp[i]);
+	  imag_tot+=fabs(cimag(val));
+	}
+	if (det==0)
+	  printf("real/imag tots are %14.4e %14.4e\n",real_tot,imag_tot);
+      }
+      else {
+	if (det==0)
+	  printf("missing twogamma.\n");
+	actData real_tot=0;
+	actData imag_tot=0;
+	for (int i=0;i<tod->ndata;i++) {
+	  tmp[i]=creal(cexp(I*-4*tod->hwp[i])*ctmp[i]);
+	  actComplex val=cexp(I*(-4*tod->hwp[i]))*ctmp[i];
+	  //tod->data[det][i]=tmp[i];
+	}
+	if (det==0)
+	  printf("real/imag tots are %14.4e %14.4e\n",real_tot,imag_tot);
+      }
+      fftw_execute_dft_r2c(plan_r2c,tmp,ctmp);
+      memcpy(ctmp,tdata[det],nmode*sizeof(actComplex));   //copy the intensity data back in
+      fftw_execute_dft_c2r(plan_c2r,ctmp,tod->data[det]);
+      
+    }
+    fftw_free(tmp);
+    fftw_free(ctmp);
+    fftw_free(ctmp2);
+  }
+  
+  //printf("finished the FFTs.\n");
+  
+  fftw_destroy_plan(plan_r2c);
+  fftw_destroy_plan(plan_c2r);
+  fftw_destroy_plan(plan_c2c);
+
+  //printf("destroyed plans.\n");
+
+  fftw_plan_with_nthreads(omp_get_max_threads());
+  
+  //actComplex **dataft=fft_all_data(tod);
+  return 0;
+  
+}
+/*--------------------------------------------------------------------------------*/
+DemodData *init_demod_data(mbTOD *tod, actData hwp_freq, actData lowpass_freq, actData lowpass_taper, actData highpass_freq,actData highpass_taper)
+{
+  DemodData *demod=(DemodData *)calloc(1,sizeof(DemodData));
+  if (hwp_freq<=0) {
+    demod->hwp_freq=get_hwp_freq(tod);
+  }
+  else
+    demod->hwp_freq=hwp_freq;
+
+  demod->lowpass_freq=lowpass_freq;
+  demod->lowpass_taper=lowpass_taper;
+  demod->highpass_freq=highpass_freq;
+  demod->highpass_taper=highpass_taper;
+  actData dnu=1.0/(tod->deltat*tod->ndata);
+  demod->nmode=2*demod->hwp_freq/dnu;
+  
+  
+  
+  return demod;
+
+}
+/*--------------------------------------------------------------------------------*/
+void set_demod_freqs(DemodData *demod, actData *freqs, int nfreq)
+{
+  printf("have %d frequencies in set_demod_freqs.\n",nfreq);
+  if (demod->freqs) {
+    free(demod->freqs);
+  }
+  demod->freqs=vector(nfreq);
+  demod->nfreq=nfreq;
+  for (int i=0;i<nfreq;i++) {
+    printf("setting frequency %d to %14.4g\n",i,freqs[i]);
+    demod->freqs[i]=freqs[i];
+  }
+  
+}
+/*--------------------------------------------------------------------------------*/
+void free_demod_data(DemodData *demod)
+{
+  if (demod->data) {
+    if (demod->data[0])
+      free(demod->data[0]);
+    free(demod->data);    
+  }
+  demod->data=NULL;
+}
+/*--------------------------------------------------------------------------------*/
+void destroy_demod_data(DemodData *demod) 
+{
+  free_demod_data(demod);
+  free(demod);
+}
+/*--------------------------------------------------------------------------------*/
+int get_demod_nchannel(DemodData *demod) 
+{
+  return 1+2*demod->nfreq;  //always assume we store I
+}
+/*--------------------------------------------------------------------------------*/
+actData get_hwp_freq(mbTOD *tod)
+{
+  if (tod->hwp==NULL) {
+    fprintf(stderr,"Warning - did not find saved HWP in get_hwp_freq.\n");
+    return 0;    
+  }
+  actData ttot=0;
+  actData hwp_tot=0;
+  for (int i=1;i<tod->ndata;i++) {
+    if (tod->hwp[i]>tod->hwp[i-1]) {
+      hwp_tot+=(tod->hwp[i]-tod->hwp[i-1]);
+      ttot+=tod->deltat;
+    }
+    
+  }
+  actData freq=hwp_tot/ttot/2/M_PI;
+  printf("hwp frequency is %14.4f\n",freq);
+  return freq;
+}
+/*--------------------------------------------------------------------------------*/
+void demodulate_data(mbTOD *tod, DemodData *demod) 
+{
+  //printf("greetings from demodulate_data.\n");
+  actData dnu=1.0/(tod->deltat*tod->ndata);
+  int nchan=get_demod_nchannel(demod);
+
+  if (demod->data==NULL)  {
+    printf("allocating storage in demodulate_data.\n");
+    demod->data=cmatrix(tod->ndet*nchan,demod->nmode);
+  }
+
+  fftw_plan_with_nthreads(1);
+
+  double *tmp=(double *)fftw_malloc(tod->ndata*sizeof(double));  
+  actComplex *ctmp=(actComplex *)fftw_malloc(tod->ndata*sizeof(actComplex));
+  fftw_plan plan_r2c=fftw_plan_dft_r2c_1d(tod->ndata,tmp,ctmp,FFTW_ESTIMATE);
+  fftw_plan plan_c2r=fftw_plan_dft_c2r_1d(tod->ndata,ctmp,tmp,FFTW_ESTIMATE);
+  fftw_free(tmp);
+  fftw_free(ctmp);
+  printf("plans are made.\n");
+#pragma omp parallel shared(tod,demod,plan_r2c,plan_c2r,nchan,dnu) default(none)
+  {
+    double *tmp=(double *)fftw_malloc(tod->ndata*sizeof(double));  
+    double *tmp_demod=(double *)fftw_malloc(tod->ndata*sizeof(double));  
+    actComplex *ctmp=(actComplex *)fftw_malloc(tod->ndata*sizeof(actComplex));
+    actData normfac=1.0/tod->ndata;
+
+#pragma omp for
+    for (int det=0;det<tod->ndet;det++) {
+      //printf("det is %d\n",det);
+      int dd=det*nchan;
+      fftw_execute_dft_r2c(plan_r2c,tod->data[det],ctmp);
+      //printf("did first fft.\n");
+      memcpy(demod->data[dd],ctmp,demod->nmode*sizeof(actComplex));
+      memset(ctmp,0,demod->nmode*sizeof(actComplex));
+      if (demod->highpass_freq>0) {
+	int istart=demod->highpass_freq/dnu;
+	memset(ctmp+istart,0,(tod->ndata-istart)*sizeof(actComplex));
+      }
+      
+      fftw_execute_dft_c2r(plan_c2r,ctmp,tmp);
+      //printf("did second fft.\n");
+      for (int ff=0;ff<demod->nfreq;ff++) {
+	//printf("ff is %d of %d\n",ff,demod->nfreq);
+	for (int i=0;i<tod->ndata;i++)
+	  tmp_demod[i]=tmp[i]*cos(tod->hwp[i]*demod->freqs[ff])*normfac;
+	fftw_execute_dft_r2c(plan_r2c,tmp_demod,ctmp);
+	memcpy(demod->data[dd+1+2*ff],ctmp,demod->nmode*sizeof(actComplex));
+
+	for (int i=0;i<tod->ndata;i++)
+	  tmp_demod[i]=tmp[i]*sin(tod->hwp[i]*demod->freqs[ff])*normfac;
+	fftw_execute_dft_r2c(plan_r2c,tmp_demod,ctmp);
+	memcpy(demod->data[dd+2+2*ff],ctmp,demod->nmode*sizeof(actComplex));	
+      }
+    }
+    //printf("freeing.\n");
+   
+    fftw_free(tmp);
+    fftw_free(tmp_demod);
+    fftw_free(ctmp);
+    //printf("freed.\n");
+  }
+  
+
+  fftw_plan_with_nthreads(omp_get_max_threads());
+  //printf("replanned.\n");
   
 }
