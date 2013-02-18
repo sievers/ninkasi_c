@@ -1397,7 +1397,7 @@ ACTpolPointingFit *update_actpol_pointing(mbTOD *tod, actData *dx, actData *dy, 
 
 /*--------------------------------------------------------------------------------*/
 #ifdef ACTPOL
-void precalc_actpol_pointing_exact(mbTOD *tod)
+void precalc_actpol_pointing_exact(mbTOD *tod, int op_flag)
 {
   assert(tod);
   if (!tod->actpol_pointing) {
@@ -1432,10 +1432,24 @@ void precalc_actpol_pointing_exact(mbTOD *tod)
     
     return;
   }
+
+  if (op_flag==0) {
+    printf("no operations requested in precalc_actpol_pointing_exact.  Returning...\n");
+    return;
+  }
+
+  const bool do_radec=(op_flag&NINKASI_DO_RADEC)>0;
+  const bool do_2gamma=(op_flag&NINKASI_DO_TWOGAMMA)>0;
+
+
+  
+  
+  //#pragma omp parallel shared(tod,do_radec,do_2gamma) default(none)
 #pragma omp parallel shared(tod) default(none)
   {
     const bool do_hwp=(tod->hwp!=NULL);  //maybe declaring this const will let HWP adjustment happen quickly
     
+
     ACTpolArray *array = ACTpolArray_alloc(tod->ndet);
     double xcent=0.0;
     double ycent=0.0;
@@ -1468,14 +1482,31 @@ void precalc_actpol_pointing_exact(mbTOD *tod)
       
       ACTpolState_update(state,myctime,tod->alt[i],tod->az[i]);
       ACTpolArrayCoords_update(coords, state);
-      for (int j=0;j<tod->ndet;j++) {
-        ACTpolFeedhornCoords *fc = &(coords->horn[j]);
-	tod->ra_saved[j][i]=fc->ra;
-	tod->dec_saved[j][i]=fc->dec;
-	tod->twogamma_saved[j][i]=atan2(fc->sin2gamma,fc->cos2gamma);
-	if (do_hwp)
-	  tod->twogamma_saved[j][i]+=4*tod->hwp[i];
-	
+
+      if (do_2gamma) {
+	if (do_hwp) {
+	  for (int j=0;j<tod->ndet;j++) {
+	    ACTpolFeedhornCoords *fc = &(coords->horn[j]);
+	    tod->twogamma_saved[j][i]=atan2(fc->sin2gamma,fc->cos2gamma);
+	    if (do_hwp)
+	      tod->twogamma_saved[j][i]+=4*tod->hwp[i];
+	  }
+	}  
+	else {
+	  for (int j=0;j<tod->ndet;j++) {
+	    ACTpolFeedhornCoords *fc = &(coords->horn[j]);
+	    tod->twogamma_saved[j][i]=atan2(fc->sin2gamma,fc->cos2gamma);
+	  }
+	  
+	}
+      }
+      if (do_radec) {
+	for (int j=0;j<tod->ndet;j++) {
+	  ACTpolFeedhornCoords *fc = &(coords->horn[j]);
+	  tod->ra_saved[j][i]=fc->ra;
+	  tod->dec_saved[j][i]=fc->dec;
+	  
+	}
       }
     }
 #if 0
@@ -1495,6 +1526,142 @@ void precalc_actpol_pointing_exact(mbTOD *tod)
     
   }
   
+  
+}
+#endif
+
+/*--------------------------------------------------------------------------------*/
+#ifdef ACTPOL
+void find_tod_radec_lims_actpol_pointing_exact(mbTOD *tod,actData rawrap)
+{
+  if (rawrap<=0)
+    rawrap+=2*M_PI;
+  assert(tod);
+  if (!tod->actpol_pointing) {
+    fprintf(stderr,"Error in precalc_actpol_exact.  Please call initialize_actpol_pointing first before trying to use this routine.\n");
+    return;
+  }
+
+  bool is_pointing_needed=false;
+
+
+  if (tod->ra_saved) 
+    fprintf(stderr,"RA is already cached in precalc_actpol_exact.\n");
+  else {
+    is_pointing_needed=true;
+    //tod->ra_saved=matrix(tod->ndet,tod->ndata);    
+  }
+  if (tod->dec_saved) 
+    fprintf(stderr,"Dec is already cached in precalc_actpol_exact.\n");
+  else {
+    is_pointing_needed=true;
+    //tod->dec_saved=matrix(tod->ndet,tod->ndata);    
+  }
+  if (!is_pointing_needed) {
+    //Pointing is already here, go through and check the limits
+    actData ramin=tod->ra_saved[0][0];
+    actData ramax=tod->ra_saved[0][0];
+    actData decmin=tod->dec_saved[0][0];
+    actData decmax=tod->dec_saved[0][0];
+
+    for (int i=0;i<tod->ndet;i++)
+      for (int j=0;j<tod->ndata;j++) {
+	if (tod->ra_saved[i][j]<ramin)
+	  ramin=tod->ra_saved[i][j];
+	if (tod->ra_saved[i][j]>ramax)
+	  ramax=tod->ra_saved[i][j];
+	if (tod->dec_saved[i][j]<decmin)
+	  decmin=tod->dec_saved[i][j];
+	if (tod->dec_saved[i][j]>decmax)
+	  decmax=tod->dec_saved[i][j];
+      }
+    tod->ramin=ramin;
+    tod->ramax=ramax;
+    tod->decmin=decmin;
+    tod->decmax=decmax;
+    return;
+  }
+  tod->ramin=1000;
+  tod->ramax=-1000;
+  tod->decmin=1000;
+  tod->decmax=-1000;
+#pragma omp parallel shared(tod,rawrap) default(none)
+  {
+    const bool do_hwp=(tod->hwp!=NULL);  //maybe declaring this const will let HWP adjustment happen quickly
+    
+    ACTpolArray *array = ACTpolArray_alloc(tod->ndet);
+    double xcent=0.0;
+    double ycent=0.0;
+
+    ACTpolArray_init(array, tod->actpol_pointing->freq, xcent,ycent);
+    for (int i=0;i<tod->ndet;i++) {
+      ACTpolFeedhorn_init(&(array->horn[i]),tod->actpol_pointing->dx[i],tod->actpol_pointing->dy[i],tod->actpol_pointing->theta[i]);
+    }
+    ACTpolWeather weather;
+    ACTpolWeather_default(&weather);
+    
+    ACTpolArrayCoords *coords = ACTpolArrayCoords_alloc(array);
+    ACTpolArrayCoords_init(coords);
+
+    ACTpolState *state = ACTpolState_alloc();
+    ACTpolState_init(state);
+
+    ACTpolScan scan;
+    ACTpolScan_init(&scan, tod->actpol_pointing->alt0,tod->actpol_pointing->az0,tod->actpol_pointing->az_throw);
+
+    ACTpolArrayCoords_update_refraction(coords, &scan, &weather);
+    
+    actData ramin=1000;
+    actData ramax=-1000;
+    actData decmin=1000;
+    actData decmax=-1000;
+
+#pragma omp for
+    for (int i=0;i<tod->ndata;i++) {
+      actData myctime;
+      if (tod->dt)
+	myctime=tod->dt[i];
+      else
+	myctime=tod->ctime+tod->deltat*(actData)i;
+      
+      ACTpolState_update(state,myctime,tod->alt[i],tod->az[i]);
+      ACTpolArrayCoords_update(coords, state);
+      for (int j=0;j<tod->ndet;j++) {
+        ACTpolFeedhornCoords *fc = &(coords->horn[j]);
+	actData ra=fc->ra;
+	actData dec=fc->dec;
+	if (ra>rawrap)
+	  ra-=2*M_PI;
+	if (ra>ramax)
+	  ramax=ra;
+	if (ra<ramin)
+	  ramin=ra;
+	if (dec>decmax)
+	  decmax=dec;
+	if (dec<decmin)
+	  decmin=dec;
+	
+      }
+    }
+    ACTpolState_free(state);
+    ACTpolArrayCoords_free(coords);
+    ACTpolArray_free(array);
+#pragma omp critical
+    {
+      if (ramin<tod->ramin)
+	tod->ramin=ramin;
+      if (ramax>tod->ramax)
+	tod->ramax=ramax;
+      if (decmin<tod->decmin)
+	tod->decmin=decmin;
+      if (decmax>tod->decmax)
+	tod->decmax=decmax;
+    }
+    
+    
+  }
+  
+  printf("limits in find_tod_radec_lims_actpol_pointing_exact are %14.6f %14.6f %14.6f %14.6f\n",tod->ramin,tod->ramax,tod->decmin,tod->decmax);
   
 }
 #endif

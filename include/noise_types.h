@@ -127,6 +127,19 @@ typedef struct {
 
 
 
+/*--------------------------------------------------------------------------------*/
+/*structure to hold hwp demodulated things*/
+typedef struct {
+  actComplex **data;  
+  actData hwp_freq;
+  actData lowpass_freq; //in units of the hwp
+  actData lowpass_taper; 
+  actData highpass_freq; //in units of the hwp
+  actData highpass_taper;
+  actData *freqs;  //if you want multiple demodulated timestreams, this are the frequencies
+  int nfreq;
+  int nmode;  //number of frequencies to keep
+} DemodData;
 
 
 #endif
