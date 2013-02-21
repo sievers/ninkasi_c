@@ -1969,18 +1969,18 @@ void tod2map_nocopy(MAP *map, mbTOD *tod,PARAMS *params)
 
   assert(map);
   assert(map->projection);
-
 #pragma omp parallel shared(map,tod,inds)
   {
     PointingFitScratch *scratch=allocate_pointing_fit_scratch(tod);
 #pragma omp for schedule(dynamic,4)
-    for (int i=0;i<tod->ndet;i++) 
+    for (int i=0;i<tod->ndet;i++) { 
       if ((!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i]))&&(is_det_listed(tod,params,i)))
 	get_pointing_vec_new(tod,map,i,inds[i],scratch);  
+    }
     destroy_pointing_fit_scratch(scratch);
     
    }
-  
+
   for (int i=0;i<tod->ndet;i++) {
     if ((!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i]))&&(is_det_listed(tod,params,i))) {
       
@@ -2043,13 +2043,13 @@ void tod2map(MAP *map, mbTOD *tod, PARAMS *params)
 
 
   int nproc;
-  printf("projecting TOD into map.\n");
+  //printf("projecting TOD into map.\n");
 #pragma omp parallel shared(nproc) default(none)
 #pragma omp single
   nproc=omp_get_num_threads();
   
   if (nproc*map->npix*sizeof(actData)>tod->ndata*tod->ndet*sizeof(int)) {
-    printf("doing index-saving projection.\n");
+    //printf("doing index-saving projection.\n");
     tod2map_nocopy(map,tod,params);
     return;
   }

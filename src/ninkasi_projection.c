@@ -128,11 +128,11 @@ void get_map_projection_wchecks(const mbTOD *tod, const MAP *map, int det, int *
     memcpy(ind,tod->pixelization_saved[det],sizeof(int)*tod->ndata);
     return;
   }
-
   get_radec_from_altaz_fit_1det_coarse(tod,det,scratch);
 #if 1
   convert_radec_to_map_pixel(scratch->ra,scratch->dec,ind,tod->ndata,map);
   if (inbounds) {  //checking map pixellization inboundness
+    printf("checking pixellization.\n");
     for (int i=0;i<tod->ndata;i++) {
       if ((ind[i]<0)||(ind[i]>=map->npix)) {
 	fprintf(stderr,"We are going to have a problem at ra/dec %14.6f %14.6f mapped to pixel %d\n",scratch->ra[i],scratch->dec[i],ind[i]);
@@ -177,7 +177,11 @@ void get_map_projection_wchecks(const mbTOD *tod, const MAP *map, int det, int *
 	if (i>331550)
 	  printf("getting pixel for %14.6f %14.6f\n",scratch->dec[i],scratch->ra[i]);
 	*/
-	ang2pix_ring(map->projection->nside,PI_OVER_TWO-scratch->dec[i],scratch->ra[i],&ind[i]);
+
+	//ang2pix_ring(map->projection->nside,PI_OVER_TWO-scratch->dec[i],scratch->ra[i],&ind[i]);
+	long tmp;
+	ang2pix_ring(map->projection->nside,PI_OVER_TWO-scratch->dec[i],scratch->ra[i],&tmp);
+	ind[i]=tmp;
 	/*
 	if (i>331550)
 	  printf("pixel is %d\n",ind[i]);
@@ -190,7 +194,11 @@ void get_map_projection_wchecks(const mbTOD *tod, const MAP *map, int det, int *
   case(NK_HEALPIX_NEST): 
     for (int i=0;i<tod->ndata;i++) {
       //printf("getting pixel for %14.6f %14.6f\n",scratch->dec[i],scratch->ra[i]);
-      ang2pix_nest(map->projection->nside,PI_OVER_TWO-scratch->dec[i],scratch->ra[i],&ind[i]);
+
+      //ang2pix_nest(map->projection->nside,PI_OVER_TWO-scratch->dec[i],scratch->ra[i],&ind[i]);
+      long tmp;
+      ang2pix_nest(map->projection->nside,PI_OVER_TWO-scratch->dec[i],scratch->ra[i],&tmp);
+      ind[i]=tmp;
       //printf("pixel is %d\n",ind[i]);
       
     }
@@ -274,7 +282,7 @@ void pix2radec_cea(MAP *map, int rapix, int decpix, actData *ra, actData *dec)
 void pix2radec_tan(MAP *map, int rapix, int decpix, actData *ra, actData *dec)
 {
 
-  printf("ra crap is %14.4e %14.4e %14.4e\n",rapix,map->projection->rapix,map->projection->radelt);
+  printf("ra crap is %d %14.4e %14.4e\n",rapix,map->projection->rapix,map->projection->radelt);
 
   double xx=(rapix-map->projection->rapix)*map->projection->radelt;
   double yy=(decpix-map->projection->decpix)*map->projection->decdelt;
@@ -688,12 +696,18 @@ void convert_radec_to_map_pixel(const actData *ra, const actData *dec, int *ind,
 #ifdef USE_HEALPIX
   case(NK_HEALPIX_RING):
     for (int i=0;i<ndata;i++) {
-      ang2pix_ring(map->projection->nside,PI_OVER_TWO-dec[i],ra[i],&ind[i]);
+      //ang2pix_ring(map->projection->nside,PI_OVER_TWO-dec[i],ra[i],&ind[i]);
+      long tmp;
+      ang2pix_ring(map->projection->nside,PI_OVER_TWO-dec[i],ra[i],&tmp);
+      ind[i]=tmp;
     }
     break;
   case(NK_HEALPIX_NEST):
     for (int i=0;i<ndata;i++) {
-      ang2pix_nest(map->projection->nside,PI_OVER_TWO-dec[i],ra[i],&ind[i]); 
+      //ang2pix_nest(map->projection->nside,PI_OVER_TWO-dec[i],ra[i],&ind[i]); 
+      long tmp;
+      ang2pix_nest(map->projection->nside,PI_OVER_TWO-dec[i],ra[i],&tmp); 
+      ind[i]=tmp;
     }
     break;
 #endif
