@@ -173,6 +173,7 @@ typedef struct {
   int ncol;            //!< dimensions of array; column
   actData **data;      //!< the actual pixel data; use as data[det_number][time_index] 
                        //!< where det_number is the detector index into the rows, cols arrays.
+  actData **calib_facs_saved;  //2D-array where calibration factors for the data are saved.
   int have_data;
   int decimate;        //!< decimate factor - for each value here, apply a factor of 2 decimation to the data.
   int n_to_window;     //!< how many samples at end to cut/window out.

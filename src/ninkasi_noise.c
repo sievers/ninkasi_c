@@ -990,7 +990,7 @@ actComplex *nkMCEButterworth(mbTOD *tod)
     
 }
 /*--------------------------------------------------------------------------------*/
-void apply_real_filter_to_data(mbTOD *tod, actData *filt)
+void apply_real_filter_to_data(mbTOD *tod, const actData *filt)
 {
   assert(tod->data);
   actComplex **data_ft=fft_all_data(tod);
@@ -1012,10 +1012,14 @@ void apply_real_filter_to_data(mbTOD *tod, actData *filt)
 /*--------------------------------------------------------------------------------*/
 void apply_complex_filter_to_data(mbTOD *tod, actComplex *filt)
 {
+  //printf("hello and welcome to my function.\n");
   assert(tod->data);
   actComplex **data_ft=fft_all_data(tod);
+  //printf("got fft.\n");
   const int nn=fft_real2complex_nelem(tod->ndata);
-  
+  //printf("nn is %d\n",nn);
+
+
 #pragma omp parallel for shared(tod,data_ft,filt) default(none)
   for (int i=0;i<tod->ndet;i++)
     if (!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i])) {
@@ -1023,7 +1027,10 @@ void apply_complex_filter_to_data(mbTOD *tod, actComplex *filt)
 	data_ft[i][j]*=filt[j];  
     }
   
+  //printf("filter is applied.\n");
+
   ifft_all_data(tod,data_ft);
+  //printf("data is iffted.\n");
   free(data_ft[0]);
   free(data_ft);  
 }
@@ -1332,6 +1339,7 @@ actComplex **fft_all_data_flag(mbTOD *tod, unsigned flags)
   assert(tod->ndet>0);
 
   int nn=get_nn(tod->ndata);
+  //printf("inside, nn is %d\n",nn);
   actComplex **data_fft=cmatrix(tod->ndet,nn);
 
   int *n=ivector(tod->ndet);
@@ -1353,6 +1361,8 @@ actComplex **fft_all_data_flag(mbTOD *tod, unsigned flags)
 #else  
   //fprintf(stderr,"Preparing plan with %d %d %d.\n",tod->ndet,tod->ndata,nn);
   fftw_plan plan=fftw_plan_many_dft_r2c(1,n,tod->ndet,tod->data[0],NULL,1,tod->ndata,data_fft[0],NULL,1,nn,flags);
+  if (plan==NULL)
+    printf("Had a problem getting the fft plan.\n");
   //fprintf(stderr,"Executing plan.\n");
   fftw_execute(plan);
   //fprintf(stderr,"Executed plan.\n");
