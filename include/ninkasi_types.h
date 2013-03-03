@@ -56,7 +56,15 @@ typedef struct todvec_struct_s TODvec;
 /*--------------------------------------------------------------------------------*/
 
 
-#define MAX_NPOL 4
+#define MAX_NPOL 6
+#define POL_ERROR 0
+#define POL_I 1
+#define POL_IQU 2
+#define POL_QU 3
+#define POL_IQU_PRECON 4
+#define POL_QU_PRECON 5
+
+
 
 struct map_struct_s {
   actData pixsize;

@@ -201,6 +201,7 @@ void assign_tod_value(mbTOD *tod, actData val);
 void free_tod_storage(mbTOD *tod);
 void map2det_scaled(const MAP *map, const mbTOD *tod, actData *vec, actData scale_fac, int *ind, int det, PointingFitScratch *scratch);
 
+int get_map_poltag(const MAP *map);
 int get_npol_in_map(const MAP *map);
 void set_map_polstate(MAP *map, int *pol_state);
 int is_map_polarized(MAP *map);
@@ -208,6 +209,7 @@ int is_map_polarized(MAP *map);
 
 void tod2map(MAP *map, mbTOD *tod, PARAMS *params);
 void tod2polmap(MAP *map,mbTOD *tod);
+void tod2polmap_copy(MAP *map,mbTOD *tod);
 int *tod2map_actpol(MAP *map, mbTOD *tod, int *ipiv_proc);
 
 
@@ -237,6 +239,7 @@ int tod2cutvec(mbTOD *tod, actData *cutvec);
 int cutvec2tod(mbTOD *tod, actData *cutvec);
 
 
+
 void get_tod_uncut_regions(mbTOD *tod);
 void reverse_tod_uncut_regions(mbTOD *tod);
 void decimate_uncut_regions(mbTOD *tod);
@@ -259,7 +262,8 @@ void add_src2tod(mbTOD *tod, actData ra, actData dec, actData src_amp, const act
 void add_srcvec2tod(mbTOD *tod, actData *ra, actData *dec, actData *src_amp, int nsrc,const actData *beam, actData dtheta, int nbeam, int oversamp);
 void tod2srcvec(actData *src_amp_out,mbTOD *tod, actData *ra_in, actData *dec_in, int nsrc_in,const actData *beam, actData dtheta, int nbeam, int oversamp);
 void find_map_index_limits(MAP *map, mbTOD *tod, int *imin_out, int *imax_out);
-
+void invert_pol_precon(MAP *map);
+void apply_pol_precon(MAP *map, MAP *precon);
 
 //from ninkasi_projection
 //void get_map_projection(const mbTOD *tod, const MAP *map, int det, int *ind, PointingFitScratch *scratch);

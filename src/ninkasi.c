@@ -2110,7 +2110,7 @@ void tod2map(MAP *map, mbTOD *tod, PARAMS *params)
   } 
 }
 /*--------------------------------------------------------------------------------*/
-void polmap2tod(MAP *map, mbTOD *tod)
+void polmap2tod_old(MAP *map, mbTOD *tod)
 {
   assert(tod);
   assert(tod->data);
@@ -2160,6 +2160,80 @@ void polmap2tod(MAP *map, mbTOD *tod)
 }
 /*--------------------------------------------------------------------------------*/
 
+void polmap2tod(MAP *map, mbTOD *tod)
+{
+  assert(tod);
+  assert(tod->data);
+  assert(tod->pixelization_saved);
+  assert(tod->uncuts);
+
+
+  const int npol=get_npol_in_map(map);
+  const int poltag=get_map_poltag(map);
+  const int npix=map->npix;
+  if (poltag==POL_ERROR) {
+    fprintf(stderr,"Error - unrecognized combination in tod2polmap_copy.\n");
+    return;
+  }
+#pragma omp parallel shared(map,tod) default(none)
+  {
+    const actData *mymap=map->map;
+    switch(poltag){
+    case POL_I:
+#pragma omp for
+      for (int det=0;det<tod->ndet;det++) {
+	int row=tod->rows[det];
+	int col=tod->cols[det];
+	mbUncut *uncut=tod->uncuts[row][col];
+	for (int region=0;region<uncut->nregions;region++) {
+	  for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++)
+	    tod->data[det][j]+=mymap[tod->pixelization_saved[det][j]];
+	}
+      }
+      break;
+    case POL_IQU:
+#pragma omp for
+      for (int det=0;det<tod->ndet;det++) {
+	int row=tod->rows[det];
+	int col=tod->cols[det];
+	mbUncut *uncut=tod->uncuts[row][col];
+	for (int region=0;region<uncut->nregions;region++) {
+	  for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++){
+	    actData mycos=cos7_pi(tod->twogamma_saved[det][j]);
+	    actData mysin=sin7_pi(tod->twogamma_saved[det][j]);
+	    int jj=tod->pixelization_saved[det][j]*npol;
+	    tod->data[det][j]+=mymap[jj];
+	    tod->data[det][j]+=mymap[jj+1]*mycos;
+	    tod->data[det][j]+=mymap[jj+2]*mysin;
+	  }
+	}
+      }
+      break;
+    case POL_QU:
+#pragma omp for
+      for (int det=0;det<tod->ndet;det++) {
+	int row=tod->rows[det];
+	int col=tod->cols[det];
+	mbUncut *uncut=tod->uncuts[row][col];
+	for (int region=0;region<uncut->nregions;region++) {
+	  for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++){
+	    actData mycos=cos7_pi(tod->twogamma_saved[det][j]);
+	    actData mysin=sin7_pi(tod->twogamma_saved[det][j]);
+	    int jj=tod->pixelization_saved[det][j]*npol;
+	    tod->data[det][j]+=mymap[jj]*mycos;
+	    tod->data[det][j]+=mymap[jj+1]*mysin;
+	  }
+	}
+      }
+      break;
+    default:
+      printf("Error - unsupported poltag in polmap2tod.\n");
+      break;
+    }
+  }
+}
+
+/*--------------------------------------------------------------------------------*/
 void tod2polmap(MAP *map,mbTOD *tod)
 {
   assert(tod);
@@ -2210,8 +2284,251 @@ void tod2polmap(MAP *map,mbTOD *tod)
 	}
 	cur_pol++;
       }
+      if (pol_ind==3) {  //Q^2
+#pragma omp parallel shared(pol_ind,map,tod,cur_pol)
+        for (int det=0;det<tod->ndet;det++) {
+          int row=tod->rows[det];
+          int col=tod->cols[det];
+          mbUncut *uncut=tod->uncuts[row][col];
+          for (int region=0;region<uncut->nregions;region++)
+            for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++) {
+	      actData mycos=cos(tod->twogamma_saved[det][j]);
+#pragma omp atomic
+	      map->map[tod->pixelization_saved[det][j]+cur_pol*map->npix]+=tod->data[det][j]*mycos*mycos;
+	    }
+	}
+	cur_pol++;
+      }
+
+      if (pol_ind==4) {  //Q*U
+#pragma omp parallel shared(pol_ind,map,tod,cur_pol)
+        for (int det=0;det<tod->ndet;det++) {
+          int row=tod->rows[det];
+          int col=tod->cols[det];
+          mbUncut *uncut=tod->uncuts[row][col];
+          for (int region=0;region<uncut->nregions;region++)
+            for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++) {
+	      actData mycos=cos(tod->twogamma_saved[det][j]);
+	      actData mysin=sin(tod->twogamma_saved[det][j]);
+#pragma omp atomic
+	      map->map[tod->pixelization_saved[det][j]+cur_pol*map->npix]+=tod->data[det][j]*mycos*mysin;
+	    }
+	}
+	cur_pol++;
+      }
+      
+      if (pol_ind==5) {  //U^2
+#pragma omp parallel shared(pol_ind,map,tod,cur_pol)
+        for (int det=0;det<tod->ndet;det++) {
+          int row=tod->rows[det];
+          int col=tod->cols[det];
+          mbUncut *uncut=tod->uncuts[row][col];
+          for (int region=0;region<uncut->nregions;region++)
+            for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++) {
+	      actData mysin=sin(tod->twogamma_saved[det][j]);
+#pragma omp atomic
+	      map->map[tod->pixelization_saved[det][j]+cur_pol*map->npix]+=tod->data[det][j]*mysin*mysin;
+	    }
+	}
+	cur_pol++;
+      }
       
     }
+}
+/*--------------------------------------------------------------------------------*/
+static inline void get_twogamma_sincos(actData *sinval, actData *cosval, const actData *sin_azparams, const actData *cos_azparams, int nazparams, actData az,actData sin_tvec_param, actData cos_tvec_param,actData tfrac)
+{
+  *sinval=0;
+  *cosval=0;
+  for (int i=0;i<4;i++) {
+    *sinval=sin_azparams[i]+az*(*sinval);
+    *cosval=cos_azparams[i]+az*(*cosval);
+  }
+  *sinval+=sin_tvec_param*tfrac;
+  *cosval+=cos_tvec_param*tfrac;
+}
+/*--------------------------------------------------------------------------------*/
+
+void tod2polmap_copy(MAP *map,mbTOD *tod)
+{
+  assert(tod);
+  assert(tod->data);
+  assert(tod->pixelization_saved);
+  assert(tod->uncuts);
+
+  const int npol=get_npol_in_map(map);
+  const int poltag=get_map_poltag(map);
+  const int npix=map->npix;
+  if (poltag==POL_ERROR) {
+    fprintf(stderr,"Error - unrecognized combination in tod2polmap_copy.\n");
+    return;
+  }
+#pragma omp parallel shared(map,tod) default(none)
+  {
+    const ACTpolPointingFit *pfit=tod->actpol_pointing;
+    const actData *az=tod->az;
+    actData *mymap=vector(npol*map->npix);
+    actData ninv=1.0/tod->ndata;
+    memset(mymap,0,npol*map->npix*sizeof(actData));
+    switch(poltag){
+    case POL_I:
+#pragma omp for
+      for (int det=0;det<tod->ndet;det++) {
+	int row=tod->rows[det];
+	int col=tod->cols[det];
+	mbUncut *uncut=tod->uncuts[row][col];
+	for (int region=0;region<uncut->nregions;region++) {
+	  for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++)
+	    mymap[tod->pixelization_saved[det][j]]+=tod->data[det][j];	  
+	}
+      }
+      break;
+    case POL_IQU:
+#pragma omp for
+      for (int det=0;det<tod->ndet;det++) {
+
+	actData ctime_sin=pfit->gamma_ctime_sin_coeffs[det]*ninv;
+	actData ctime_cos=pfit->gamma_ctime_cos_coeffs[det]*ninv;
+	const actData *az_sin=pfit->gamma_az_sin_coeffs[det];
+	const actData *az_cos=pfit->gamma_az_cos_coeffs[det];
+
+	int row=tod->rows[det];
+	int col=tod->cols[det];
+	mbUncut *uncut=tod->uncuts[row][col];
+	for (int region=0;region<uncut->nregions;region++) {
+	  for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++){
+	    
+
+#if 1
+	    actData mysin,mycos;
+	    //get_twogamma_sincos(&mysin,&mycos,pfit->gamma_az_sin_coeffs[det],pfit->gamma_az_cos_coeffs[det],pfit->n_gamma_az_coeffs,tod->az[j],pfit->gamma_ctime_sin_coeffs[det],pfit->gamma_ctime_cos_coeffs[det],j*ninv);
+	    actData aa=az[j];
+	    mysin=az_sin[3]+aa*(az_sin[2]+aa*(az_sin[1]+aa*(az_sin[0])))+ctime_sin*j;
+	    mycos=az_cos[3]+aa*(az_cos[2]+aa*(az_cos[1]+aa*(az_cos[0])))+ctime_cos*j;
+	    
+	    //actData mycos=cos7_pi(tod->twogamma_saved[det][j]);
+	    //actData mysin=sin7_pi(tod->twogamma_saved[det][j]);
+
+
+#else
+	    actData mycos=cos(tod->twogamma_saved[det][j]);
+	    actData mysin=sin(tod->twogamma_saved[det][j]);
+#endif
+#if 1
+	    int jj=tod->pixelization_saved[det][j]*npol;
+	    mymap[jj]+=tod->data[det][j];
+	    mymap[jj+1]+=tod->data[det][j]*mycos;
+	    mymap[jj+2]+=tod->data[det][j]*mysin;
+
+#else
+	    mymap[tod->pixelization_saved[det][j]]+=tod->data[det][j];
+	    mymap[tod->pixelization_saved[det][j]+npix]+=tod->data[det][j]*mycos;
+	    mymap[tod->pixelization_saved[det][j]+2*npix]+=tod->data[det][j]*mysin;
+#endif
+	  }
+	}
+      }
+      break;
+
+    case POL_QU:
+#pragma omp for
+      for (int det=0;det<tod->ndet;det++) {
+	int row=tod->rows[det];
+	int col=tod->cols[det];
+	mbUncut *uncut=tod->uncuts[row][col];
+	for (int region=0;region<uncut->nregions;region++) {
+	  for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++){
+#if 1
+	    actData mycos=cos7_pi(tod->twogamma_saved[det][j]);
+	    actData mysin=sin7_pi(tod->twogamma_saved[det][j]);
+	    int jj=tod->pixelization_saved[det][j]*npol;
+	    mymap[jj]+=tod->data[det][j]*mycos;
+	    mymap[jj+1]+=tod->data[det][j]*mysin;
+	    
+#else
+	    mymap[tod->pixelization_saved[det][j]]+=tod->data[det][j]*cos(tod->twogamma_saved[det][j]);
+	    mymap[tod->pixelization_saved[det][j]+npix]+=tod->data[det][j]*sin(tod->twogamma_saved[det][j]);
+#endif
+	  }
+	}
+      }
+      break;
+
+    case POL_IQU_PRECON:
+#pragma omp for
+      for (int det=0;det<tod->ndet;det++) {
+	int row=tod->rows[det];
+	int col=tod->cols[det];
+	mbUncut *uncut=tod->uncuts[row][col];
+	for (int region=0;region<uncut->nregions;region++) {
+	  for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++){
+#if 1
+	    
+	    actData mycos=cos7_pi(tod->twogamma_saved[det][j]);
+	    actData mysin=sin7_pi(tod->twogamma_saved[det][j]);
+#else
+	    actData mycos=cos(tod->twogamma_saved[det][j]);
+	    actData mysin=sin(tod->twogamma_saved[det][j]);
+#endif
+#if 1
+	    //int jj=tod->pixelization_saved[det][j]*npix;
+	    int jj=tod->pixelization_saved[det][j]*npol;
+	    
+	    mymap[jj]+=tod->data[det][j];
+	    mymap[jj+1]+=tod->data[det][j]*mycos;
+	    mymap[jj+2]+=tod->data[det][j]*mysin;
+	    mymap[jj+3]+=tod->data[det][j]*mycos*mycos;
+	    mymap[jj+4]+=tod->data[det][j]*mycos*mysin;
+	    mymap[jj+5]+=tod->data[det][j]*mysin*mysin;
+#else
+	    mymap[tod->pixelization_saved[det][j]]+=tod->data[det][j];
+	    mymap[tod->pixelization_saved[det][j]+npix]+=tod->data[det][j]*mycos;
+	    mymap[tod->pixelization_saved[det][j]+2*npix]+=tod->data[det][j]*mysin;
+	    mymap[tod->pixelization_saved[det][j]+3*npix]+=tod->data[det][j]*mycos*mycos;
+	    mymap[tod->pixelization_saved[det][j]+4*npix]+=tod->data[det][j]*mycos*mysin;
+	    mymap[tod->pixelization_saved[det][j]+5*npix]+=tod->data[det][j]*mysin*mysin;
+
+#endif
+	  }
+	}
+      }
+      break;
+    default:  //should never get here, as error should have already triggered above.
+      printf("Error - Don't know how to deal with map polarization in tod2polmap_copy.\n");
+      break;
+    }
+#pragma omp critical(reduce_first)
+    for (int i=0;i<npix;i++) {
+      map->map[i]+=mymap[i];
+    }
+    if (npol>=2) {
+#pragma omp critical(reduce_second)
+      for (int i=npix;i<2*npix;i++) 
+	map->map[i]+=mymap[i];
+    }    
+    if (npol>=3) {
+#pragma omp critical(reduce_third)
+      for (int i=2*npix;i<3*npix;i++) 
+	map->map[i]+=mymap[i];
+    }    
+    if (npol>=4) {
+#pragma omp critical(reduce_fourth)
+      for (int i=3*npix;i<4*npix;i++) 
+	map->map[i]+=mymap[i];
+    }    
+    if (npol>=5) {
+#pragma omp critical(reduce_fifth)
+      for (int i=4*npix;i<5*npix;i++) 
+	map->map[i]+=mymap[i];
+    }    
+    if (npol>=6) {
+#pragma omp critical(reduce_sixth)
+      for (int i=5*npix;i<6*npix;i++) 
+	map->map[i]+=mymap[i];
+    }    
+    
+    free(mymap);
+  }
 }
 /*--------------------------------------------------------------------------------*/
 
@@ -2429,6 +2746,43 @@ int get_npol_in_map(const MAP *map)
 #else
   return 1;
 #endif
+}
+/*--------------------------------------------------------------------------------*/
+int get_map_poltag(const MAP *map)
+{
+#ifdef ACTPOL
+  if (map->pol_state==NULL)
+    return POL_I;
+
+
+
+  const int *ptr=map->pol_state;
+  
+  int pol_i[MAX_NPOL]={1,0,0,0,0,0};
+  if (memcmp(ptr,pol_i,sizeof(int)*MAX_NPOL)==0)
+    return POL_I;
+  
+  int pol_iqu[MAX_NPOL]={1,1,1,0,0,0};
+  if (memcmp(ptr,pol_iqu,sizeof(int)*MAX_NPOL)==0)
+    return POL_IQU;
+
+  int pol_qu[MAX_NPOL]={0,1,1,0,0,0};
+  if (memcmp(ptr,pol_qu,sizeof(int)*MAX_NPOL)==0)
+    return POL_QU;
+
+  int pol_iqu_precon[MAX_NPOL]={1,1,1,1,1,1};
+  if (memcmp(ptr,pol_iqu_precon,sizeof(int)*MAX_NPOL)==0)
+    return POL_IQU_PRECON;
+
+  int pol_qu_precon[MAX_NPOL]={0,0,0,1,1,1};
+  if (memcmp(ptr,pol_qu_precon,sizeof(int)*MAX_NPOL)==0)
+    return POL_QU_PRECON;
+  
+#else
+  return POL_I;
+#endif
+  printf("Unknown polarization configuration in get_map_poltag.\n");
+  return POL_ERROR;
 }
 /*--------------------------------------------------------------------------------*/
 #ifdef ACTPOL
@@ -4004,3 +4358,85 @@ void get_data_corrs(mbTOD *tod)
 
 
  }
+/*--------------------------------------------------------------------------------*/
+void invert_pol_precon(MAP *map)
+{
+  int poltag=get_map_poltag(map);
+#pragma omp parallel shared(map,poltag) default(none)
+  {
+    actData *mm=map->map;
+    switch(poltag){
+    case POL_IQU_PRECON:  {
+      actData **mymat=matrix(3,3);
+#pragma omp for 
+      for (int i=0;i<map->npix;i++)  {
+	int ii=i*6; //6 polarization in this map
+	if (mm[ii]>0) {
+	  mymat[0][0]=mm[ii];
+	  mymat[0][1]=mymat[1][0]=mm[ii+1]; //Q 
+	  mymat[0][2]=mymat[2][0]=mm[ii+2]; //U
+	  mymat[1][1]=mm[ii+3];             //Q^2
+	  mymat[1][2]=mymat[2][1]=mm[ii+4]; //Q*U
+	  mymat[2][2]=mm[ii+5];             //U^2
+	  invert_posdef_mat(mymat,3);
+	  mm[ii]=mymat[0][0];
+	  mm[ii+1]=mymat[0][1];
+	  mm[ii+2]=mymat[0][2];
+	  mm[ii+3]=mymat[1][1];
+	  mm[ii+4]=mymat[1][2];
+	  mm[ii+5]=mymat[2][2];
+	}
+      }
+      free(mymat[0]);
+      free(mymat);
+      break;
+    }
+    default:
+      printf("Not set up yet in invert_pol_precon.  you may have some code to write...\n");
+      break;
+    }
+          
+  }
+}
+
+/*--------------------------------------------------------------------------------*/
+void apply_pol_precon(MAP *map, MAP *precon)
+{
+  int poltag=get_map_poltag(map);
+  int precontag=get_map_poltag(precon);
+  if (poltag==POL_IQU) 
+    if (precontag!=POL_IQU_PRECON) {
+      fprintf(stderr,"ERror in apply_pol_precon - preconditioner is not appropriate for the IQU map.\n");
+      return;
+    }
+  if (poltag==POL_QU) 
+    if (precontag!=POL_QU_PRECON) {
+      fprintf(stderr,"Error in apply_pol_precon - preconditioner is not appropriate for the QU map.\n");
+      return;
+    }
+  
+#pragma omp parallel shared(map,precon,poltag) default(none)
+  {
+    actData *mm=map->map;
+    actData *pp=precon->map;
+    switch(poltag){
+    case POL_IQU:  {
+#pragma omp for schedule(static,512)
+      for (int i=0;i<map->npix;i++)  {
+	int im=i*3; //3 pols in map;
+	int ip=i*6; //6 pols in precon;
+	//just multiplying a 3x3 matrix in precon by a 3 element vector in map, but precon only stores half the matrix, 
+	//so indexing can look a little hairy
+	actData tmp1=mm[im]*pp[ip]+mm[im+1]*pp[ip+1]+mm[im+2]*pp[ip+2];
+	actData tmp2=mm[im]*pp[ip+1]+mm[im+1]*pp[im+3]+mm[im+2]*pp[im+4];
+	actData tmp3=mm[im]*pp[ip+2]+mm[im+1]*pp[im+4]+mm[im+2]*pp[im+5];
+      }
+      
+    }
+      break;
+    default:
+      printf("Don't have polarization written up in apply_pol_precon.  You probably have some coding to do.\n");
+      break;
+    }
+  }
+}
