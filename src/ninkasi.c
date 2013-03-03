@@ -2172,11 +2172,17 @@ void polmap2tod(MAP *map, mbTOD *tod)
   const int poltag=get_map_poltag(map);
   const int npix=map->npix;
   if (poltag==POL_ERROR) {
-    fprintf(stderr,"Error - unrecognized combination in tod2polmap_copy.\n");
+    fprintf(stderr,"Error - unrecognized combination in polmap2tod.\n");
     return;
   }
 #pragma omp parallel shared(map,tod) default(none)
   {
+    
+    const ACTpolPointingFit *pfit=tod->actpol_pointing;
+    const actData *az=tod->az;
+    actData ninv=1.0/tod->ndata;
+
+
     const actData *mymap=map->map;
     switch(poltag){
     case POL_I:
@@ -2194,13 +2200,22 @@ void polmap2tod(MAP *map, mbTOD *tod)
     case POL_IQU:
 #pragma omp for
       for (int det=0;det<tod->ndet;det++) {
+	actData ctime_sin=pfit->gamma_ctime_sin_coeffs[det]*ninv;
+	actData ctime_cos=pfit->gamma_ctime_cos_coeffs[det]*ninv;
+	const actData *az_sin=pfit->gamma_az_sin_coeffs[det];
+	const actData *az_cos=pfit->gamma_az_cos_coeffs[det];
+
 	int row=tod->rows[det];
 	int col=tod->cols[det];
 	mbUncut *uncut=tod->uncuts[row][col];
 	for (int region=0;region<uncut->nregions;region++) {
 	  for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++){
-	    actData mycos=cos7_pi(tod->twogamma_saved[det][j]);
-	    actData mysin=sin7_pi(tod->twogamma_saved[det][j]);
+
+	    actData mysin,mycos;
+	    actData aa=az[j];
+	    mysin=az_sin[3]+aa*(az_sin[2]+aa*(az_sin[1]+aa*(az_sin[0])))+ctime_sin*j;
+	    mycos=az_cos[3]+aa*(az_cos[2]+aa*(az_cos[1]+aa*(az_cos[0])))+ctime_cos*j;
+
 	    int jj=tod->pixelization_saved[det][j]*npol;
 	    tod->data[det][j]+=mymap[jj];
 	    tod->data[det][j]+=mymap[jj+1]*mycos;
@@ -2349,7 +2364,8 @@ static inline void get_twogamma_sincos(actData *sinval, actData *cosval, const a
 }
 /*--------------------------------------------------------------------------------*/
 
-void tod2polmap_copy(MAP *map,mbTOD *tod)
+void tod2polmap_copy(MAP *map,mbTOD *tod) 
+//copy refers to each thread having a copy of the map.  
 {
   assert(tod);
   assert(tod->data);
@@ -2359,19 +2375,21 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
   const int npol=get_npol_in_map(map);
   const int poltag=get_map_poltag(map);
   const int npix=map->npix;
+
   if (poltag==POL_ERROR) {
     fprintf(stderr,"Error - unrecognized combination in tod2polmap_copy.\n");
     return;
   }
 #pragma omp parallel shared(map,tod) default(none)
   {
+    actData mysin,mycos;
     const ACTpolPointingFit *pfit=tod->actpol_pointing;
     const actData *az=tod->az;
     actData *mymap=vector(npol*map->npix);
     actData ninv=1.0/tod->ndata;
     memset(mymap,0,npol*map->npix*sizeof(actData));
     switch(poltag){
-    case POL_I:
+    case POL_I: 
 #pragma omp for
       for (int det=0;det<tod->ndet;det++) {
 	int row=tod->rows[det];
@@ -2398,33 +2416,16 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
 	for (int region=0;region<uncut->nregions;region++) {
 	  for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++){
 	    
-
-#if 1
-	    actData mysin,mycos;
 	    //get_twogamma_sincos(&mysin,&mycos,pfit->gamma_az_sin_coeffs[det],pfit->gamma_az_cos_coeffs[det],pfit->n_gamma_az_coeffs,tod->az[j],pfit->gamma_ctime_sin_coeffs[det],pfit->gamma_ctime_cos_coeffs[det],j*ninv);
 	    actData aa=az[j];
 	    mysin=az_sin[3]+aa*(az_sin[2]+aa*(az_sin[1]+aa*(az_sin[0])))+ctime_sin*j;
 	    mycos=az_cos[3]+aa*(az_cos[2]+aa*(az_cos[1]+aa*(az_cos[0])))+ctime_cos*j;
-	    
-	    //actData mycos=cos7_pi(tod->twogamma_saved[det][j]);
-	    //actData mysin=sin7_pi(tod->twogamma_saved[det][j]);
 
-
-#else
-	    actData mycos=cos(tod->twogamma_saved[det][j]);
-	    actData mysin=sin(tod->twogamma_saved[det][j]);
-#endif
-#if 1
 	    int jj=tod->pixelization_saved[det][j]*npol;
 	    mymap[jj]+=tod->data[det][j];
 	    mymap[jj+1]+=tod->data[det][j]*mycos;
 	    mymap[jj+2]+=tod->data[det][j]*mysin;
 
-#else
-	    mymap[tod->pixelization_saved[det][j]]+=tod->data[det][j];
-	    mymap[tod->pixelization_saved[det][j]+npix]+=tod->data[det][j]*mycos;
-	    mymap[tod->pixelization_saved[det][j]+2*npix]+=tod->data[det][j]*mysin;
-#endif
 	  }
 	}
       }
@@ -2457,21 +2458,25 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
     case POL_IQU_PRECON:
 #pragma omp for
       for (int det=0;det<tod->ndet;det++) {
+	actData ctime_sin=pfit->gamma_ctime_sin_coeffs[det]*ninv;
+	actData ctime_cos=pfit->gamma_ctime_cos_coeffs[det]*ninv;
+	const actData *az_sin=pfit->gamma_az_sin_coeffs[det];
+	const actData *az_cos=pfit->gamma_az_cos_coeffs[det];
+
 	int row=tod->rows[det];
 	int col=tod->cols[det];
 	mbUncut *uncut=tod->uncuts[row][col];
 	for (int region=0;region<uncut->nregions;region++) {
 	  for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++){
-#if 1
+
+	    //get_twogamma_sincos(&mysin,&mycos,pfit->gamma_az_sin_coeffs[det],pfit->gamma_az_cos_coeffs[det],pfit->n_gamma_az_coeffs,tod->az[j],pfit->gamma_ctime_sin_coeffs[det],pfit->gamma_ctime_cos_coeffs[det],j*ninv);
+	    actData aa=az[j];
+	    mysin=az_sin[3]+aa*(az_sin[2]+aa*(az_sin[1]+aa*(az_sin[0])))+ctime_sin*j;
+	    mycos=az_cos[3]+aa*(az_cos[2]+aa*(az_cos[1]+aa*(az_cos[0])))+ctime_cos*j;
 	    
 	    actData mycos=cos7_pi(tod->twogamma_saved[det][j]);
 	    actData mysin=sin7_pi(tod->twogamma_saved[det][j]);
-#else
-	    actData mycos=cos(tod->twogamma_saved[det][j]);
-	    actData mysin=sin(tod->twogamma_saved[det][j]);
-#endif
-#if 1
-	    //int jj=tod->pixelization_saved[det][j]*npix;
+
 	    int jj=tod->pixelization_saved[det][j]*npol;
 	    
 	    mymap[jj]+=tod->data[det][j];
@@ -2480,15 +2485,7 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
 	    mymap[jj+3]+=tod->data[det][j]*mycos*mycos;
 	    mymap[jj+4]+=tod->data[det][j]*mycos*mysin;
 	    mymap[jj+5]+=tod->data[det][j]*mysin*mysin;
-#else
-	    mymap[tod->pixelization_saved[det][j]]+=tod->data[det][j];
-	    mymap[tod->pixelization_saved[det][j]+npix]+=tod->data[det][j]*mycos;
-	    mymap[tod->pixelization_saved[det][j]+2*npix]+=tod->data[det][j]*mysin;
-	    mymap[tod->pixelization_saved[det][j]+3*npix]+=tod->data[det][j]*mycos*mycos;
-	    mymap[tod->pixelization_saved[det][j]+4*npix]+=tod->data[det][j]*mycos*mysin;
-	    mymap[tod->pixelization_saved[det][j]+5*npix]+=tod->data[det][j]*mysin*mysin;
 
-#endif
 	  }
 	}
       }
@@ -4428,8 +4425,12 @@ void apply_pol_precon(MAP *map, MAP *precon)
 	//just multiplying a 3x3 matrix in precon by a 3 element vector in map, but precon only stores half the matrix, 
 	//so indexing can look a little hairy
 	actData tmp1=mm[im]*pp[ip]+mm[im+1]*pp[ip+1]+mm[im+2]*pp[ip+2];
-	actData tmp2=mm[im]*pp[ip+1]+mm[im+1]*pp[im+3]+mm[im+2]*pp[im+4];
-	actData tmp3=mm[im]*pp[ip+2]+mm[im+1]*pp[im+4]+mm[im+2]*pp[im+5];
+	actData tmp2=mm[im]*pp[ip+1]+mm[im+1]*pp[ip+3]+mm[im+2]*pp[ip+4];
+	actData tmp3=mm[im]*pp[ip+2]+mm[im+1]*pp[ip+4]+mm[im+2]*pp[ip+5];
+	mm[im]=tmp1;
+	mm[im+1]=tmp2;
+	mm[im+2]=tmp3;
+	
       }
       
     }
