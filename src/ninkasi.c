@@ -2474,8 +2474,8 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
 	    mysin=az_sin[3]+aa*(az_sin[2]+aa*(az_sin[1]+aa*(az_sin[0])))+ctime_sin*j;
 	    mycos=az_cos[3]+aa*(az_cos[2]+aa*(az_cos[1]+aa*(az_cos[0])))+ctime_cos*j;
 	    
-	    actData mycos=cos7_pi(tod->twogamma_saved[det][j]);
-	    actData mysin=sin7_pi(tod->twogamma_saved[det][j]);
+	    //actData mycos=cos7_pi(tod->twogamma_saved[det][j]);
+	    //actData mysin=sin7_pi(tod->twogamma_saved[det][j]);
 
 	    int jj=tod->pixelization_saved[det][j]*npol;
 	    
