@@ -2159,6 +2159,7 @@ void polmap2tod_old(MAP *map, mbTOD *tod)
     }
 }
 /*--------------------------------------------------------------------------------*/
+#define DO_HWP_POLMAP
 
 void polmap2tod(MAP *map, mbTOD *tod)
 {
@@ -2175,7 +2176,34 @@ void polmap2tod(MAP *map, mbTOD *tod)
     fprintf(stderr,"Error - unrecognized combination in polmap2tod.\n");
     return;
   }
+#ifdef DO_HWP_POLMAP
+  actData  *hwp_sin_raw=(actData *)malloc(sizeof(actData)*tod->ndata);
+  actData  *hwp_cos_raw=(actData *)malloc(sizeof(actData)*tod->ndata);
+  
+  if (tod->hwp)  {
+#pragma omp parallel for shared(tod,hwp_sin_raw,hwp_cos_raw) default(none)
+    for (int i=0;i<tod->ndata;i++) {
+      hwp_cos_raw[i]=cos(tod->hwp[i]*4.0);
+      hwp_sin_raw[i]=sin(tod->hwp[i]*4.0);
+    }
+  } else {
+#pragma omp parallel for shared(tod,hwp_sin_raw,hwp_cos_raw) default(none)
+    for (int i=0;i<tod->ndata;i++) {
+      hwp_cos_raw[i]=1.0;
+      hwp_sin_raw[i]=0.0;
+    }
+  }
+  const actData *hwp_sin=hwp_sin_raw;
+  const actData *hwp_cos=hwp_cos_raw;
+#endif
+
+    
+    
+#ifdef DO_HWP_POLMAP
+#pragma omp parallel shared(map,tod,hwp_sin,hwp_cos) default(none)
+#else
 #pragma omp parallel shared(map,tod) default(none)
+#endif
   {
     
     const ACTpolPointingFit *pfit=tod->actpol_pointing;
@@ -2215,7 +2243,11 @@ void polmap2tod(MAP *map, mbTOD *tod)
 	    actData aa=az[j];
 	    mysin=az_sin[3]+aa*(az_sin[2]+aa*(az_sin[1]+aa*(az_sin[0])))+ctime_sin*j;
 	    mycos=az_cos[3]+aa*(az_cos[2]+aa*(az_cos[1]+aa*(az_cos[0])))+ctime_cos*j;
-
+#ifdef DO_HWP_POLMAP
+	    actData tmp=mysin*hwp_cos[j]+mycos*hwp_sin[j];
+	    mycos=mycos*hwp_cos[j]-mysin*hwp_sin[j];
+	    mysin=tmp;
+#endif
 	    int jj=tod->pixelization_saved[det][j]*npol;
 	    tod->data[det][j]+=mymap[jj];
 	    tod->data[det][j]+=mymap[jj+1]*mycos;
@@ -2246,6 +2278,10 @@ void polmap2tod(MAP *map, mbTOD *tod)
       break;
     }
   }
+#ifdef DO_HWP_POLMAP
+  free(hwp_sin_raw);
+  free(hwp_cos_raw);
+#endif
 }
 
 /*--------------------------------------------------------------------------------*/
@@ -2380,7 +2416,32 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
     fprintf(stderr,"Error - unrecognized combination in tod2polmap_copy.\n");
     return;
   }
+#ifdef DO_HWP_POLMAP
+  actData  *hwp_sin_raw=(actData *)malloc(sizeof(actData)*tod->ndata);
+  actData  *hwp_cos_raw=(actData *)malloc(sizeof(actData)*tod->ndata);
+  
+  if (tod->hwp)  {
+#pragma omp parallel for shared(tod,hwp_sin_raw,hwp_cos_raw) default(none)
+    for (int i=0;i<tod->ndata;i++) {
+      hwp_cos_raw[i]=cos(tod->hwp[i]*4.0);
+      hwp_sin_raw[i]=sin(tod->hwp[i]*4.0);
+    }
+  } else {
+#pragma omp parallel for shared(tod,hwp_sin_raw,hwp_cos_raw) default(none)
+    for (int i=0;i<tod->ndata;i++) {
+      hwp_cos_raw[i]=1.0;
+      hwp_sin_raw[i]=0.0;
+    }
+  }
+  const actData *hwp_sin=hwp_sin_raw;
+  const actData *hwp_cos=hwp_cos_raw;
+#endif
+
+#ifdef DO_HWP_POLMAP
+#pragma omp parallel shared(map,tod,hwp_sin,hwp_cos) default(none)
+#else
 #pragma omp parallel shared(map,tod) default(none)
+#endif
   {
     actData mysin,mycos;
     const ACTpolPointingFit *pfit=tod->actpol_pointing;
@@ -2421,6 +2482,11 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
 	    mysin=az_sin[3]+aa*(az_sin[2]+aa*(az_sin[1]+aa*(az_sin[0])))+ctime_sin*j;
 	    mycos=az_cos[3]+aa*(az_cos[2]+aa*(az_cos[1]+aa*(az_cos[0])))+ctime_cos*j;
 
+#ifdef DO_HWP_POLMAP
+	    actData tmp=mysin*hwp_cos[j]+mycos*hwp_sin[j];
+	    mycos=mycos*hwp_cos[j]-mysin*hwp_sin[j];
+	    mysin=tmp;
+#endif
 	    int jj=tod->pixelization_saved[det][j]*npol;
 	    mymap[jj]+=tod->data[det][j];
 	    mymap[jj+1]+=tod->data[det][j]*mycos;
@@ -2473,11 +2539,32 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
 	    actData aa=az[j];
 	    mysin=az_sin[3]+aa*(az_sin[2]+aa*(az_sin[1]+aa*(az_sin[0])))+ctime_sin*j;
 	    mycos=az_cos[3]+aa*(az_cos[2]+aa*(az_cos[1]+aa*(az_cos[0])))+ctime_cos*j;
+#ifdef DO_HWP_POLMAP
+	    actData tmp=mysin*hwp_cos[j]+mycos*hwp_sin[j];
+	    mycos=mycos*hwp_cos[j]-mysin*hwp_sin[j];
+	    mysin=tmp;
+#endif
+
 	    
-	    actData mycos=cos7_pi(tod->twogamma_saved[det][j]);
-	    actData mysin=sin7_pi(tod->twogamma_saved[det][j]);
+	    //actData mycos=cos7_pi(tod->twogamma_saved[det][j]);
+	    //actData mysin=sin7_pi(tod->twogamma_saved[det][j]);
 
 	    int jj=tod->pixelization_saved[det][j]*npol;
+#if 1
+	    
+	    //mymap[jj]+=1;
+	    //mymap[jj+1]+=hwp_cos[j];
+	    //mymap[jj+2]+=hwp_sin[j];
+	    //mymap[jj+3]+=hwp_cos[j]*hwp_cos[j];
+	    //mymap[jj+4]+=hwp_cos[j]*hwp_sin[j];
+	    //mymap[jj+5]+=hwp_sin[j]*hwp_sin[j];
+	    mymap[jj]+=1;
+	    mymap[jj+1]+=mycos;
+	    mymap[jj+2]+=mysin;
+	    mymap[jj+3]+=mycos*mycos;
+	    mymap[jj+4]+=mysin*mycos;
+	    mymap[jj+5]+=mysin*mysin;
+#else
 	    
 	    mymap[jj]+=tod->data[det][j];
 	    mymap[jj+1]+=tod->data[det][j]*mycos;
@@ -2485,7 +2572,7 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
 	    mymap[jj+3]+=tod->data[det][j]*mycos*mycos;
 	    mymap[jj+4]+=tod->data[det][j]*mycos*mysin;
 	    mymap[jj+5]+=tod->data[det][j]*mysin*mysin;
-
+#endif
 	  }
 	}
       }
@@ -2526,6 +2613,11 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
     
     free(mymap);
   }
+#ifdef DO_HWP_POLMAP
+  free(hwp_sin_raw);
+  free(hwp_cos_raw);
+#endif
+
 }
 /*--------------------------------------------------------------------------------*/
 
@@ -2842,9 +2934,19 @@ void map2det(const MAP *map, const mbTOD *tod, actData *vec, int *ind, int det, 
     break;
   }
 #else
+#if 1  //28-Mar-2013, finally fixing cut samples seeing the map.  Should converge to same map, but now won't crash if cut data fall outside map limits.
+  int row=tod->rows[det];
+  int col=tod->cols[det];
+  mbUncut *uncut=tod->uncuts[row][col];
+  for (int region=0;region<uncut->nregions;region++) {
+    for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++)
+      vec[j]+=map->map[ind[j]];
+  }
+#else  //old code
   for (int j=0;j<tod->ndata;j++) {
     vec[j]+=map->map[ind[j]];
   }
+#endif
 #endif
 
   
@@ -4375,7 +4477,8 @@ void invert_pol_precon(MAP *map)
 	  mymat[1][1]=mm[ii+3];             //Q^2
 	  mymat[1][2]=mymat[2][1]=mm[ii+4]; //Q*U
 	  mymat[2][2]=mm[ii+5];             //U^2
-	  invert_posdef_mat(mymat,3);
+	  //invert_posdef_mat(mymat,3);
+	  dinvsafe(mymat[0],3,1e-6);
 	  mm[ii]=mymat[0][0];
 	  mm[ii+1]=mymat[0][1];
 	  mm[ii+2]=mymat[0][2];

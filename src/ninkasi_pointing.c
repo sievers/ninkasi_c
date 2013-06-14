@@ -1406,25 +1406,37 @@ void precalc_actpol_pointing_exact(mbTOD *tod, int op_flag)
   }
 
   bool is_pointing_needed=false;
+  if (op_flag==0) {
+    printf("no operations requested in precalc_actpol_pointing_exact.  Returning...\n");
+    return;
+  }
+  
+  const bool do_radec=(op_flag&NINKASI_DO_RADEC)>0;
+  const bool do_2gamma=(op_flag&NINKASI_DO_TWOGAMMA)>0;
 
 
-  if (tod->ra_saved) 
-    fprintf(stderr,"RA is already cached in precalc_actpol_exact.\n");
-  else {
-    is_pointing_needed=true;
-    tod->ra_saved=matrix(tod->ndet,tod->ndata);    
+
+  if (do_radec) {
+    if (tod->ra_saved) 
+      fprintf(stderr,"RA is already cached in precalc_actpol_exact.\n");
+    else {
+      is_pointing_needed=true;
+      tod->ra_saved=matrix(tod->ndet,tod->ndata);    
+    }
+    if (tod->dec_saved) 
+      fprintf(stderr,"Dec is already cached in precalc_actpol_exact.\n");
+    else {
+      is_pointing_needed=true;
+      tod->dec_saved=matrix(tod->ndet,tod->ndata);    
+    }
   }
-  if (tod->dec_saved) 
-    fprintf(stderr,"Dec is already cached in precalc_actpol_exact.\n");
-  else {
-    is_pointing_needed=true;
-    tod->dec_saved=matrix(tod->ndet,tod->ndata);    
-  }
-  if (tod->twogamma_saved) 
-    fprintf(stderr,"2*gamma is already cached in precalc_actpol_exact.\n");
-  else {
-    is_pointing_needed=true;
-    tod->twogamma_saved=matrix(tod->ndet,tod->ndata);    
+  if (do_2gamma) {
+    if (tod->twogamma_saved) 
+      fprintf(stderr,"2*gamma is already cached in precalc_actpol_exact.\n");
+    else {
+      is_pointing_needed=true;
+      tod->twogamma_saved=matrix(tod->ndet,tod->ndata);    
+    }
   }
   if (!is_pointing_needed) {
     fprintf(stderr,"Pointing appears to be fully cached.  Returning.  If you really wanted to recalculate pointing, call free_tod_pointing_saved first.\n");
@@ -1432,16 +1444,9 @@ void precalc_actpol_pointing_exact(mbTOD *tod, int op_flag)
     
     return;
   }
-
-  if (op_flag==0) {
-    printf("no operations requested in precalc_actpol_pointing_exact.  Returning...\n");
-    return;
-  }
-
-  const bool do_radec=(op_flag&NINKASI_DO_RADEC)>0;
-  const bool do_2gamma=(op_flag&NINKASI_DO_TWOGAMMA)>0;
-
-
+  
+  
+  
   
   
   //#pragma omp parallel shared(tod,do_radec,do_2gamma) default(none)
@@ -1488,8 +1493,8 @@ void precalc_actpol_pointing_exact(mbTOD *tod, int op_flag)
 	  for (int j=0;j<tod->ndet;j++) {
 	    ACTpolFeedhornCoords *fc = &(coords->horn[j]);
 	    tod->twogamma_saved[j][i]=atan2(fc->sin2gamma,fc->cos2gamma);
-	    if (do_hwp)
-	      tod->twogamma_saved[j][i]+=4*tod->hwp[i];
+	    //if (do_hwp)
+	    //tod->twogamma_saved[j][i]+=4*tod->hwp[i];
 	  }
 	}  
 	else {
@@ -1545,14 +1550,16 @@ void find_tod_radec_lims_actpol_pointing_exact(mbTOD *tod,actData rawrap)
   bool is_pointing_needed=false;
 
 
-  if (tod->ra_saved) 
-    fprintf(stderr,"RA is already cached in precalc_actpol_exact.\n");
+  if (tod->ra_saved) {
+    //fprintf(stderr,"RA is already cached in precalc_actpol_exact.\n");
+  }
   else {
     is_pointing_needed=true;
     //tod->ra_saved=matrix(tod->ndet,tod->ndata);    
   }
-  if (tod->dec_saved) 
-    fprintf(stderr,"Dec is already cached in precalc_actpol_exact.\n");
+  if (tod->dec_saved)  {
+    //fprintf(stderr,"Dec is already cached in precalc_actpol_exact.\n");
+  }
   else {
     is_pointing_needed=true;
     //tod->dec_saved=matrix(tod->ndet,tod->ndata);    

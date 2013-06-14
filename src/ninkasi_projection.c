@@ -729,20 +729,37 @@ void convert_saved_pointing_to_pixellization(mbTOD *tod, MAP *map)
 {
   if ((!tod->ra_saved) ||(!tod->dec_saved)) {
     fprintf(stderr,"Missing ra/dec in TOD in convert_saved_pointing_to_pixellization.\n");
-    return;
+    //return;
   }
   if (!tod->pixelization_saved)
     tod->pixelization_saved=imatrix(tod->ndet,tod->ndata);
+  
+  if ((!tod->ra_saved) ||(!tod->dec_saved)) {
+#pragma omp parallel shared(tod,map) default(none)
+    {
+      PointingFitScratch *scratch=allocate_pointing_fit_scratch(tod);
+      #pragma omp for 
+      for (int i=0;i<tod->ndet;i++) {
+	get_pointing_vec_new(tod,map,i,tod->pixelization_saved[i],scratch);
+	convert_radec_to_map_pixel(scratch->ra,scratch->dec,tod->pixelization_saved[i],tod->ndata,map);
+      }
+      destroy_pointing_fit_scratch(scratch);
+      
+    }
+  } else {
+
+
 #pragma omp parallel for shared(tod,map) default(none)
-  for (int i=0;i<tod->ndet;i++)
+    for (int i=0;i<tod->ndet;i++)
     convert_radec_to_map_pixel(tod->ra_saved[i],tod->dec_saved[i],tod->pixelization_saved[i],tod->ndata,map);
   
   free(tod->ra_saved[0]);
   free(tod->ra_saved);
   tod->ra_saved=NULL;
-
+  
   free(tod->dec_saved[0]);
   free(tod->dec_saved);
   tod->dec_saved=NULL;
+  }
   
 }

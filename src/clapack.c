@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <nk_clapack.h>
 
 void dsyrk_(char *uplo, char *trans, int *n, int *k, double *alpha, double *a, int *lda, double *beta, double *c, int *ldc, int uplolen, int translen);
@@ -85,6 +86,14 @@ void clapack_ssyevd(char jobz, char uplo, int n, float *a, int lda, float *w, fl
 
 /*--------------------------------------------------------------------------------*/
 
+void clapack_dsyevd(char jobz, char uplo, int n, double *a, int lda, double *w, double *work, int lwork,int *iwork, int liwork, int *info)
+{
+  dsyevd_(&jobz,&uplo,&n, a,&lda, w,work,&lwork,iwork,&liwork,info,1,1);
+}
+
+
+/*--------------------------------------------------------------------------------*/
+
 void clapack_ssyevd_simple(char jobz, char uplo, int n, float *a, int lda, float *w, int *info)
 /*allocate scratch space for the user & make all the calls*/
 {
@@ -104,6 +113,65 @@ void clapack_ssyevd_simple(char jobz, char uplo, int n, float *a, int lda, float
   
 }
 
+/*--------------------------------------------------------------------------------*/
+
+void clapack_dsyevd_simple(char jobz, char uplo, int n, double *a, int lda, double *w, int *info)
+/*allocate scratch space for the user & make all the calls*/
+{
+  double fwork;
+  int liwork,lwork;
+
+  clapack_dsyevd(jobz,uplo,n,a,lda,w,&fwork,-1,&liwork,-1,info);
+
+  lwork=fwork+1;  //extra number just in case..
+  double *work=(double *)malloc(sizeof(double)*lwork);
+  int *iwork=(int *)malloc(sizeof(int)*liwork);
+
+  clapack_dsyevd(jobz,uplo,n,a,lda,w,work,lwork,iwork,liwork,info);
+
+  free(work);
+  free(iwork);
+  
+}
+/*--------------------------------------------------------------------------------*/
+int dinvsafe(double *a, int n, double thresh)
+//invert a potentially singular positive definite matrix. Any eigenvalues below
+//thresh*max(eigenvalues) will be replaced by zero in the inverse.
+{
+  double *myeigs=(double *)malloc(sizeof(double)*n);
+  double *mytmp=(double *)malloc(sizeof(double)*n*n);
+  //memcpy(mytmp,a,n*n*sizeof(double));
+  for (int i=0;i<n*n;i++)
+    mytmp[i]=a[i];
+  int info;
+  clapack_dsyevd_simple('V','U',n,mytmp,n,myeigs,&info);
+  double max_eig=myeigs[0];
+  for (int i=1;i<n;i++)
+    if (myeigs[i]>max_eig)
+      max_eig=myeigs[i];
+
+  int i_am_sketchy=0;
+  for (int i=0;i<n;i++) {
+    if (myeigs[i]<thresh*max_eig)  {
+      i_am_sketchy=1;
+      myeigs[i]=0;      
+  }
+    else
+      myeigs[i]=1.0/sqrt(myeigs[i]);
+  }
+  for (int i=0;i<n;i++) {
+    for (int j=0;j<n;j++)
+      mytmp[i*n+j]*=myeigs[i];
+  }
+  clapack_dsyrk('U','N',n,n,1.0,mytmp,n,0.0,a,n);
+  for (int i=0;i<n;i++)
+    for (int j=i+1;j<n;j++) {
+      a[i*n+j]=a[j*n+i];
+    }
+  free(myeigs);
+  free(mytmp);
+  return i_am_sketchy;
+}
 /*--------------------------------------------------------------------------------*/
 
 void clapack_ssyev_simple(char jobz, char uplo, int n, float *a, int lda, float *w, int *info)

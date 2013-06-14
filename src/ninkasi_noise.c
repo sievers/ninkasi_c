@@ -2171,6 +2171,57 @@ void fit_hwp_poly_to_data(mbTOD *tod, int nsin, int npoly, actData **fitp, actDa
 }
 
 /*--------------------------------------------------------------------------------*/
+void fit_hwp_az_poly_to_data(mbTOD *tod, int nsin, int naz,int npoly, actData **fitp, actData **vecs_out)
+{
+  int nparam=2*nsin+npoly+naz;
+  actData **mat;
+  if (vecs_out==NULL)
+    mat=matrix(tod->ndata,nparam);
+  else
+    mat=vecs_out;
+  fill_sin_cos_mat(tod->hwp,tod->ndata,nsin,mat);
+  if (naz>0) {
+    actData azmin=tod->az[0];
+    actData azmax=tod->az[0];
+    for (int i=1;i<tod->ndata;i++) {
+      if (tod->az[i]<azmin)
+	azmin=tod->az[i];
+      if (tod->az[i]>azmax)
+	azmax=tod->az[i];
+    }
+    actData *az_scale=vector(tod->ndata);
+    actData az_fac=2.0/(azmax-azmin);
+    printf("azmin, azmax, and az_fac are %12.6f %12.6f %12.6f\n",azmin,azmax,az_fac);
+    for (int i=0;i<tod->ndata;i++) {
+      az_scale[i]= az_fac*(tod->az[i]-azmin)-1;
+    }
+    for (int i=0;i<tod->ndata;i++) {
+      mat[i][2*nsin]=az_scale[i];
+      for (int j=1;j<naz;j++)
+	mat[i][2*nsin+j]=mat[i][2*nsin+j-1]*az_scale[i];
+    }
+    
+    free(az_scale);
+  }
+  
+  if (npoly>0) {
+    actData nn=tod->ndata;
+    for (int i=0;i<tod->ndata;i++) {
+      actData x=2.0*(i/nn)-1.0;
+      mat[i][2*nsin+naz]=1.0;
+      for (int j=1;j<npoly;j++) 
+	mat[i][2*nsin+naz+j]=mat[i][2*nsin+naz+j-1]*x;
+    }
+  }
+  linfit_many_vecs(tod->data,mat,tod->ndata, tod->ndet, nparam,fitp);
+  //printf("Finished fit.\n");
+  if (vecs_out==NULL) {
+    free(mat[0]);
+    free(mat);
+  }
+}
+
+/*--------------------------------------------------------------------------------*/
 void remove_hwp_poly_from_data(mbTOD *tod, int nsin, int npoly) 
 //remove a HWP signal from TOD data.
 {
@@ -2178,6 +2229,23 @@ void remove_hwp_poly_from_data(mbTOD *tod, int nsin, int npoly)
   actData **vecs=matrix(tod->ndata,nparam);
   actData **fitp=matrix(tod->ndet,nparam);
   fit_hwp_poly_to_data(tod,nsin,npoly,fitp,vecs);
+  printf("calling gemm.\n");
+  act_gemm('t','n',tod->ndata,tod->ndet,nparam,-1.0,vecs[0],nparam,fitp[0],nparam,1.0,tod->data[0],tod->ndata);
+  printf("finished gemm.\n");
+  free(vecs[0]);
+  free(vecs);
+  free(fitp[0]);
+  free(fitp);
+}
+
+/*--------------------------------------------------------------------------------*/
+void remove_hwp_az_poly_from_data(mbTOD *tod, int nsin, int naz, int npoly) 
+//remove a HWP signal from TOD data.
+{
+  int nparam=2*nsin+naz+npoly;
+  actData **vecs=matrix(tod->ndata,nparam);
+  actData **fitp=matrix(tod->ndet,nparam);
+  fit_hwp_az_poly_to_data(tod,nsin,naz,npoly,fitp,vecs);
   printf("calling gemm.\n");
   act_gemm('t','n',tod->ndata,tod->ndet,nparam,-1.0,vecs[0],nparam,fitp[0],nparam,1.0,tod->data[0],tod->ndata);
   printf("finished gemm.\n");

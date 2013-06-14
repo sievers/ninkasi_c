@@ -22,9 +22,13 @@ void ssyev_(char *jobz, char *uplo, int *n, float *a, int *lda, float *w, float 
 void clapack_ssyev(char jobz, char uplo, int n, float *a, int lda, float *w, float *work, int lwork, int *info);
 
 void clapack_ssyevd(char jobz, char uplo, int n, float *a, int lda, float *w, float *work, int lwork,int *iwork, int liwork, int *info);
+void clapack_dsyevd(char jobz, char uplo, int n, double *a, int lda, double *w, double *work, int lwork,int *iwork, int liwork, int *info);
+void clapack_dsyevd_simple(char jobz, char uplo, int n, double *a, int lda, double *w, int *info);
 #ifdef _SKIP_MKL
 void ssyevd_(char *jobz, char *uplo, int *n, float *a, int *lda, float *w, float *work, int *lwork,int *iwork, int *liwork, int *info, int jobzlen, int uplolen);
 #endif
+int dinvsafe(double *a, int n, double thresh);
+
 
 
 

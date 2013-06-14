@@ -1,4 +1,4 @@
-
+#include <stdio.h>
 #include <assert.h>
 #include <math.h>
 
@@ -1028,8 +1028,22 @@ get_iers_bulletin_a( double mjd, double *dut1, double *x, double *y )
     }
     else
     {
-        assert( 1 == 0 );
-        return -1;
+      //assert( 1 == 0 );
+      //*x=0;
+      //*y=0;
+      //*dut1=0;
+      fprintf(stderr,"Warning - iers bulleting out of range.  Requested MJD is %0.2f, range is %d %d.  *DO* *NOT* *USE* for actual data - only OK for sims!!!.\n",mjd,s1_mjd_range[0],s4_mjd_range[1]);
+      if (mjd<s1_mjd_range[0]) {
+	while (mjd<s1_mjd_range[0])
+	  mjd+=365.24219;
+	get_iers_bulletin_a_for_season( s1, s1_mjd_range[0], mjd, dut1, x, y );
+      }
+      else {
+	while (mjd>s4_mjd_range[1])
+	  mjd -= 365.24219;
+	get_iers_bulletin_a_for_season( s4, s4_mjd_range[0], mjd, dut1, x, y );
+      }
+      return 0;
     }
 
     return 0;

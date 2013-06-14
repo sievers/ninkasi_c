@@ -74,7 +74,10 @@ void apply_diag_proj_noise_inv_bands(actData **data_in, actData **data_out, actD
 void fill_sin_cos_mat(actData *theta, int ndata, int nterm, actData **mat);
 void fill_tod_sin_cos_vec(mbTOD *tod, int nterm, actData *vec);
 void fit_hwp_poly_to_data(mbTOD *tod, int nsin, int npoly, actData **fitp, actData **vecs);
+void fit_hwp_az_poly_to_data(mbTOD *tod, int nsin, int naz,int npoly, actData **fitp, actData **vecs_out);
 void remove_hwp_poly_from_data(mbTOD *tod, int nsin, int npoly);
+void remove_hwp_az_poly_from_data(mbTOD *tod, int nsin, int naz, int npoly);
+
 int get_demodulated_hwp_data(mbTOD *tod, actData hwp_freq, actComplex **tdata,actComplex **poldata);
 int remodulate_hwp_data(mbTOD *tod, actData hwp_freq, actComplex **tdata,actComplex **poldata);
 actData get_hwp_freq(mbTOD *tod);
