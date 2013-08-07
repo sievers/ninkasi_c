@@ -2179,6 +2179,8 @@ void fit_hwp_az_poly_to_data(mbTOD *tod, int nsin, int naz,int npoly, actData **
     mat=matrix(tod->ndata,nparam);
   else
     mat=vecs_out;
+ 
+  double t1=omp_get_wtime();
   fill_sin_cos_mat(tod->hwp,tod->ndata,nsin,mat);
   if (naz>0) {
     actData azmin=tod->az[0];
@@ -2191,7 +2193,7 @@ void fit_hwp_az_poly_to_data(mbTOD *tod, int nsin, int naz,int npoly, actData **
     }
     actData *az_scale=vector(tod->ndata);
     actData az_fac=2.0/(azmax-azmin);
-    printf("azmin, azmax, and az_fac are %12.6f %12.6f %12.6f\n",azmin,azmax,az_fac);
+    //printf("azmin, azmax, and az_fac are %12.6f %12.6f %12.6f\n",azmin,azmax,az_fac);
     for (int i=0;i<tod->ndata;i++) {
       az_scale[i]= az_fac*(tod->az[i]-azmin)-1;
     }
@@ -2213,7 +2215,11 @@ void fit_hwp_az_poly_to_data(mbTOD *tod, int nsin, int naz,int npoly, actData **
 	mat[i][2*nsin+naz+j]=mat[i][2*nsin+naz+j-1]*x;
     }
   }
+  double t2=omp_get_wtime();
+  //printf("took %12.5f seconds to fill matrix.\n",t2-t1);
   linfit_many_vecs(tod->data,mat,tod->ndata, tod->ndet, nparam,fitp);
+  t1=omp_get_wtime();
+  //printf("took %12.5f seconds to do fit.\n",t1-t2);
   //printf("Finished fit.\n");
   if (vecs_out==NULL) {
     free(mat[0]);
@@ -2246,9 +2252,10 @@ void remove_hwp_az_poly_from_data(mbTOD *tod, int nsin, int naz, int npoly)
   actData **vecs=matrix(tod->ndata,nparam);
   actData **fitp=matrix(tod->ndet,nparam);
   fit_hwp_az_poly_to_data(tod,nsin,naz,npoly,fitp,vecs);
-  printf("calling gemm.\n");
+  double t1=omp_get_wtime();
   act_gemm('t','n',tod->ndata,tod->ndet,nparam,-1.0,vecs[0],nparam,fitp[0],nparam,1.0,tod->data[0],tod->ndata);
-  printf("finished gemm.\n");
+  double t2=omp_get_wtime();
+  //printf("took %12.5f seconds to remove params.\n",t2-t1);
   free(vecs[0]);
   free(vecs);
   free(fitp[0]);

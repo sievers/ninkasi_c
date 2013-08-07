@@ -211,6 +211,34 @@ actData **matrix(long n,long m)
 }
 /*--------------------------------------------------------------------------------*/
 
+
+actData ***tensor(long k, long n,long m)
+{
+#if 1
+  actData *vec=(actData *)malloc_retry(sizeof(actData)*k*n*m);
+  actData **ptr=(actData **)malloc_retry(sizeof(actData *)*k*n);
+  for (int i=0;i<k*n;i++)
+    ptr[i]=vec+i*m;
+  actData ***ptr2=(actData ***)malloc_retry(sizeof(actData **)*k);
+  for (int i=0;i<k;i++)
+    ptr2[i]=ptr+i*n;
+  return ptr2;
+#else
+  actData **mat=matrix(k*n,m);
+
+  actData  ***ppvec;
+  ppvec=(actData ***)malloc_retry(sizeof(actData **)*k);
+  assert(ppvec!=NULL);
+  for (int i=0;i<k;i++)  {
+    ppvec[k]=&(mat[i*n]);
+    
+  }
+   
+   return ppvec;
+#endif
+}
+/*--------------------------------------------------------------------------------*/
+
 int **imatrix(long n,long m)
 {
   int *data, **ptrvec;
@@ -2550,7 +2578,7 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
 	    //actData mysin=sin7_pi(tod->twogamma_saved[det][j]);
 
 	    int jj=tod->pixelization_saved[det][j]*npol;
-#if 1
+#if 0
 	    
 	    //mymap[jj]+=1;
 	    //mymap[jj+1]+=hwp_cos[j];

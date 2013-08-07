@@ -1006,6 +1006,93 @@ void get_radec_from_altaz_fit_1det(const mbTOD *tod,int det,  PointingFitScratch
 
 }
 /*--------------------------------------------------------------------------------*/
+int get_actpol_pointing_fit_nparam()
+{
+  return ACTPOL_POINTING_NAZ+ACTPOL_POINTING_NEL+ACTPOL_POINTING_NT+ACTPOL_POINTING_NTAZ;
+}
+/*--------------------------------------------------------------------------------*/
+void initialize_actpol_pointing_fit(mbTOD *tod,actData *az_scale, actData *alt_scale, actData *t_scale, actData *ra_fitp, actData *dec_fitp)
+{
+
+  ACTPolPointingFit2 *fit=(ACTPolPointingFit2 *)malloc(sizeof(ACTPolPointingFit2));
+
+  fit->az_scale=vector(tod->ndata);
+  fit->alt_scale=vector(tod->ndata);
+  fit->t_scale=vector(tod->ndata);
+
+  int nparam=get_actpol_pointing_fit_nparam();
+
+  fit->ra_fitp=tensor(tod->nrow,tod->ncol,nparam);
+  fit->dec_fitp=tensor(tod->nrow,tod->ncol,nparam);
+
+  memcpy(fit->az_scale,az_scale,tod->ndata*sizeof(actData));
+  memcpy(fit->alt_scale,alt_scale,tod->ndata*sizeof(actData));
+  memcpy(fit->t_scale,t_scale,tod->ndata*sizeof(actData));
+
+  for (int det=0;det<tod->ndet;det++) {
+    memcpy(fit->ra_fitp[tod->rows[det]][tod->cols[det]],ra_fitp+nparam*det,nparam*sizeof(actData));
+    memcpy(fit->dec_fitp[tod->rows[det]][tod->cols[det]],dec_fitp+nparam*det,nparam*sizeof(actData));
+  }
+  tod->ACTPol_pointing_fit=fit;
+
+}
+/*--------------------------------------------------------------------------------*/
+void evaluate_actpol_pointing_fit(mbTOD *tod)
+{
+  if (!tod->ACTPol_pointing_fit) {
+    fprintf(stderr,"Error - missing pointing fit in evaluate_actpol_pointing_fit.\n");
+    return;
+  }
+  
+  if (!tod->ra_saved)
+    tod->ra_saved=matrix(tod->ndet,tod->ndata);
+  if (!tod->dec_saved)
+    tod->dec_saved=matrix(tod->ndet,tod->ndata);
+#pragma omp parallel for shared(tod) default(none)
+  for (int det=0;det<tod->ndet;det++) {
+    actData *rafit=tod->ACTPol_pointing_fit->ra_fitp[tod->rows[det]][tod->cols[det]];
+    actData *decfit=tod->ACTPol_pointing_fit->dec_fitp[tod->rows[det]][tod->cols[det]];
+    actData *az=tod->ACTPol_pointing_fit->az_scale;
+    actData *alt=tod->ACTPol_pointing_fit->alt_scale;
+    actData *t=tod->ACTPol_pointing_fit->t_scale;
+    for (int i=0;i<tod->ndata;i++) {
+      tod->ra_saved[det][i]=rafit[0]; //treat the constant term as the first az term
+      for (int ii=1;ii<ACTPOL_POINTING_NAZ;ii++)
+	tod->ra_saved[det][i]=(az[i]*tod->ra_saved[det][i])+rafit[ii];
+      actData tmp=0;
+      for (int ii=ACTPOL_POINTING_NAZ;ii<ACTPOL_POINTING_NAZ+ACTPOL_POINTING_NEL;ii++) {
+	tmp=tmp*alt[i]+rafit[ii];	
+      }
+      //tmp*=alt[i];
+      tod->ra_saved[det][i]+=tmp*alt[i];
+
+      tmp=0;
+      for (int ii=ACTPOL_POINTING_NAZ+ACTPOL_POINTING_NEL;ii<ACTPOL_POINTING_NAZ+ACTPOL_POINTING_NEL+ACTPOL_POINTING_NT;ii++)
+	tmp=tmp*t[i]+rafit[ii];
+
+      tod->ra_saved[det][i]+=tmp*t[i]+rafit[ACTPOL_POINTING_NAZ+ACTPOL_POINTING_NEL+ACTPOL_POINTING_NT]*t[i]*az[i];      	
+
+      tod->dec_saved[det][i]=decfit[0]; //treat the constant term as the first az term
+      for (int ii=1;ii<ACTPOL_POINTING_NAZ;ii++)
+	tod->dec_saved[det][i]=(az[i]*tod->dec_saved[det][i])+decfit[ii];
+      tmp=0;
+      for (int ii=ACTPOL_POINTING_NAZ;ii<ACTPOL_POINTING_NAZ+ACTPOL_POINTING_NEL;ii++) {
+	tmp=tmp*alt[i]+decfit[ii];	
+      }
+      //tmp*=alt[i];
+      tod->dec_saved[det][i]+=tmp*alt[i];
+
+      tmp=0;
+      for (int ii=ACTPOL_POINTING_NAZ+ACTPOL_POINTING_NEL;ii<ACTPOL_POINTING_NAZ+ACTPOL_POINTING_NEL+ACTPOL_POINTING_NT;ii++)
+	tmp=tmp*t[i]+decfit[ii];
+
+      tod->dec_saved[det][i]+=tmp*t[i]+decfit[ACTPOL_POINTING_NAZ+ACTPOL_POINTING_NEL+ACTPOL_POINTING_NT]*t[i]*az[i]; 
+
+    }
+  }
+}
+
+/*--------------------------------------------------------------------------------*/
 actData get_interp_segment_az_max_err(actData *az, int i1, int i2)
 {
   actData max_err=0;

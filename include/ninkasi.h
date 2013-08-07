@@ -161,6 +161,7 @@ void polmap2tod(MAP *map, mbTOD *tod);
 void clear_map(MAP *map);
 void clear_tod(mbTOD *tod);
 actData **matrix(long n,long m);
+actData ***tensor(long k, long n,long m);
 int **imatrix(long n,long m);
 actComplex **cmatrix(long n,long m);
 float **smatrix(long n,long m);

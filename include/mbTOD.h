@@ -10,7 +10,6 @@
 #include <actpol/actpol.h>
 #endif
 
-
 #include <ps_stuff.h>
 #include <mbCuts.h>
 #include "noise_types.h"
@@ -75,6 +74,7 @@ typedef struct {
 
 } TiledPointingFit;
 /*--------------------------------------------------------------------------------*/
+
 #ifdef ACTPOL
 typedef struct {
   int nhorn;
@@ -106,6 +106,20 @@ typedef struct {
 
 } ACTpolPointingFit;
 #endif
+
+/*--------------------------------------------------------------------------------*/
+#define ACTPOL_POINTING_NAZ 5
+#define ACTPOL_POINTING_NEL 2
+#define ACTPOL_POINTING_NT 2
+#define ACTPOL_POINTING_NTAZ 1
+typedef struct {
+  actData *az_scale;
+  actData *alt_scale;
+  actData *t_scale;
+  actData ***ra_fitp;
+  actData ***dec_fitp;
+}  ACTPolPointingFit2;
+
 
 /*--------------------------------------------------------------------------------*/
 
@@ -208,6 +222,7 @@ typedef struct {
   int *detrended;      //!< is 0 if detector was not detrended and 1 if detrended
 
 
+  ACTPolPointingFit2 *ACTPol_pointing_fit;
   mbPointingOffset *pointingOffset; //!< detector pointing offsets from boresight
   int detPtRow;        ///< row in camera for detPtAz etc.
   int detPtCol;        ///< column in camera for detPtAz etc.

@@ -79,5 +79,8 @@ void get_radec_from_altaz_actpol_c(double *az, double *el, double *tvec, double 
 
 #endif
 
+void initialize_actpol_pointing_fit(mbTOD *tod,actData *az_scale, actData *alt_scale, actData *t_scale, actData *ra_fitp, actData *dec_fitp);
+void evaluate_actpol_pointing_fit(mbTOD *tod);
+
 #endif
 

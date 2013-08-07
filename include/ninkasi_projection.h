@@ -37,6 +37,8 @@ void radecvec2cea_pix(const actData *ra, const actData *dec, int *rapix, int *de
 void get_map_projection(const mbTOD *tod, const MAP *map, int det, int *ind, PointingFitScratch *scratch);
 void get_map_projection_wchecks(const mbTOD *tod, const MAP *map, int det, int *ind, PointingFitScratch *scratch, bool *inbounds);
 int set_map_projection_cea_simple( MAP *map);
+int set_map_projection_cea_simple_predef( MAP *map,actData pixsize, actData pv);
+
 int set_map_projection_tan_simple( MAP *map);
 int set_map_projection_cea_simple_keeppix( MAP *map);
 void radec2pix_cea(MAP *map, actData ra, actData dec, int *rapix, int *decpix);

@@ -306,10 +306,48 @@ int set_map_projection_cea_simple( MAP *map)
 
   double cos0=cos(0.5*(map->decmax+map->decmin));
   
-  mprintf(stdout,"Map limits in set_map_projection_cea_simple are %14.8f %14.8f %14.8f %14.8f\n",map->ramin,map->ramax,map->decmin,map->decmax);
+  //mprintf(stdout,"Map limits in set_map_projection_cea_simple are %14.8f %14.8f %14.8f %14.8f\n",map->ramin,map->ramax,map->decmin,map->decmax);
   map->projection->decdelt=map->pixsize/cos0*RAD2DEG;
   map->projection->radelt= -map->projection->decdelt;
+  mprintf(stdout,"Map limits in set_map_projection_cea_simple are %14.8f %14.8f %14.8f %14.8f with pixsize %14.8f %14.8f\n",map->ramin,map->ramax,map->decmin,map->decmax,map->projection->decdelt,map->projection->radelt);
   map->projection->pv=cos0*cos0;
+  actData ra0=map->ramax*RAD2DEG/map->projection->radelt;
+  actData ra1=map->ramin*RAD2DEG/map->projection->radelt+1;  //+1 is in in case of equality
+  actData dec0=sin(map->decmin)*RAD2DEG/map->projection->pv/map->projection->decdelt;
+  actData dec1=sin(map->decmax)*RAD2DEG/map->projection->pv/map->projection->decdelt+1;  //+1 is in case of equality
+  mprintf(stdout,"Before rounding, ra0/dec0 are %14.8f %14.8f\n",ra0,dec0);
+  map->projection->rapix=-(int)ra0;
+  map->projection->decpix=-(int)dec0;
+  map->nx=ra1-ra0;
+  map->ny=dec1-dec0;
+  free(map->map);
+  map->npix=map->nx*map->ny;
+  map->map=(actData *)malloc(sizeof(actData)*map->npix);
+
+  mprintf(stdout,"Offsets are %12.4f %12.4f\n",map->projection->rapix,map->projection->decpix);
+  mprintf(stdout,"Pixsizes are %14.8f %14.8f\n",map->projection->radelt,map->projection->decdelt);
+  mprintf(stdout,"ra/dec0/1 are %14.8f %14.8f %14.8f %14.8f\n",ra0,ra1,dec0,dec1);
+  mprintf(stdout,"pv is %14.6f\n",map->projection->pv);
+  mprintf(stdout,"map sizes are %d %d\n",map->nx, map->ny);
+
+  return 0;
+}
+
+/*--------------------------------------------------------------------------------*/
+
+int set_map_projection_cea_simple_predef( MAP *map,actData pixsize, actData pv)
+{
+  map->projection->proj_type=NK_CEA;
+
+  double cos0=cos(0.5*(map->decmax+map->decmin));
+
+  mprintf(stdout,"Map limits in set_map_projection_cea_simple are %14.8f %14.8f %14.8f %14.8f\n",map->ramin,map->ramax,map->decmin,map->decmax);
+  //map->projection->decdelt=map->pixsize/cos0*RAD2DEG;
+  //map->projection->radelt= -map->projection->decdelt;
+  map->projection->decdelt=pixsize;
+  map->projection->radelt=-pixsize;
+  map->projection->pv=pv;
+  //map->projection->pv=cos0*cos0;
   actData ra0=map->ramax*RAD2DEG/map->projection->radelt;
   actData ra1=map->ramin*RAD2DEG/map->projection->radelt+1;  //+1 is in in case of equality
   actData dec0=sin(map->decmin)*RAD2DEG/map->projection->pv/map->projection->decdelt;
