@@ -2199,8 +2199,17 @@ void fit_hwp_az_poly_to_data(mbTOD *tod, int nsin, int naz,int npoly, actData **
     }
     for (int i=0;i<tod->ndata;i++) {
       mat[i][2*nsin]=az_scale[i];
+#if 1
+      //Do Legendre polynomials
+      if (naz>1) {
+	mat[i][2*nsin+1]=1.5*az_scale[i]*az_scale[i]-0.5;
+	for (int j=2;j<naz;j++)
+	  mat[i][2*nsin+j]=((2*j+1)*az_scale[i]*mat[i][2*nsin+j-1]-(j)*mat[i][2*nsin+j-2])/((actData)(j+1));
+      }
+#else
       for (int j=1;j<naz;j++)
 	mat[i][2*nsin+j]=mat[i][2*nsin+j-1]*az_scale[i];
+#endif
     }
     
     free(az_scale);

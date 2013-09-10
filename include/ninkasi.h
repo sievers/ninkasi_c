@@ -224,6 +224,7 @@ MAP *upres_map(MAP *map);
 actData map_times_map(MAP *x, MAP *y);
 void map_axpy(MAP *y, MAP *x, actData a);
 bool is_det_listed(const mbTOD *tod, const PARAMS *params, int det);
+void purge_matrix(mbTOD *tod, actData **vec, int nelem, int ngood);
 void purge_cut_detectors(mbTOD *tod);
 mbUncut ***get_uncut_regions(mbTOD *tod);
 int get_numel_cut(mbTOD *tod);

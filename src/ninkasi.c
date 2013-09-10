@@ -502,7 +502,30 @@ double *read_1d_datafile_double(char *fname, int *n)
   return vec;
 }
 /*--------------------------------------------------------------------------------*/
+void purge_matrix(mbTOD *tod, actData **vec, int nelem, int ngood)
+{
+  actData **tmp=matrix(ngood,nelem);
+  
+  int icur=0;
+  for (int i=0;i<tod->ndet;i++) {
+    if (!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i])) {
+      //tmp[icur]=vec[i];
+      memcpy(tmp[icur],vec[i],sizeof(actData)*nelem);
+      icur++;
+    }
+  }
+  free(vec[0]);
+  actData **crud=(actData **)realloc(vec,sizeof(actData *)*ngood);
+  assert(crud==vec);
 
+  for (int i=0;i<ngood;i++)
+    vec[i]=tmp[i];
+  free(tmp);
+  
+  
+
+}
+/*--------------------------------------------------------------------------------*/
 void purge_vector(mbTOD *tod, actData *vec, int ngood)
 {
   //printf("shrinking from %d to %d\n",tod->ndet,ngood);
@@ -514,6 +537,7 @@ void purge_vector(mbTOD *tod, actData *vec, int ngood)
       icur++;
     }
   }
+  
   actData *crud=(actData *)realloc(vec,sizeof(actData)*ngood);
   assert(crud==vec);
   memcpy(vec,tmp,sizeof(actData)*ngood);
@@ -539,7 +563,21 @@ void purge_cut_detectors(mbTOD *tod)
       purge_vector(tod,(tod->actpol_pointing->dy),ngood);
     if (fit->theta)
       purge_vector(tod,(tod->actpol_pointing->theta),ngood);
+    if (fit->gamma_az_cos_coeffs)
+      purge_matrix(tod,(tod->actpol_pointing->gamma_az_cos_coeffs),fit->n_gamma_az_coeffs,ngood);
+    if (fit->gamma_ctime_cos_coeffs)
+      purge_vector(tod,(tod->actpol_pointing->gamma_ctime_cos_coeffs),ngood);
+
+    if (fit->gamma_az_sin_coeffs)
+      purge_matrix(tod,(tod->actpol_pointing->gamma_az_sin_coeffs),fit->n_gamma_az_coeffs,ngood);
+    if (fit->gamma_ctime_sin_coeffs)
+      purge_vector(tod,(tod->actpol_pointing->gamma_ctime_sin_coeffs),ngood);
+
+
   }
+  
+  
+
 #endif
 
   int *rows=(int *)malloc_retry(sizeof(int)*ngood);
