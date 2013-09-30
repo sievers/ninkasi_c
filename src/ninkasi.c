@@ -528,6 +528,13 @@ void purge_matrix(mbTOD *tod, actData **vec, int nelem, int ngood)
 /*--------------------------------------------------------------------------------*/
 void purge_vector(mbTOD *tod, actData *vec, int ngood)
 {
+  if (ngood==0) {
+    printf("trying to purge to nothing on %s.\n",tod->dirfile);
+    //assert(1==0);
+    free(vec);
+    vec=NULL;
+    return;
+  }
   //printf("shrinking from %d to %d\n",tod->ndet,ngood);
   actData *tmp=vector(ngood);
   int icur=0;
