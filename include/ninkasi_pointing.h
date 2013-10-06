@@ -69,6 +69,7 @@ int act_observed_altaz_to_mean_radec( const Site *site, double freq_GHz,
 #ifdef ACTPOL
 ACTpolPointingFit *initialize_actpol_pointing(mbTOD *tod, actData *dx, actData *dy, actData *angle, actData freq,int dpiv);
 ACTpolPointingFit *update_actpol_pointing(mbTOD *tod, actData *dx, actData *dy, actData *angle, actData freq,int dpiv);
+void precalc_actpol_pointing_exact_subsampled(mbTOD *tod, int downsamp, actData **ra, actData **dec, actData **twogamma);
 void precalc_actpol_pointing_exact(mbTOD *tod,int op_flag);
 void precalc_actpol_pointing(mbTOD *tod);
 void precalc_actpol_pointing_free(mbTOD *tod);

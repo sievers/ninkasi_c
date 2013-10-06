@@ -1484,6 +1484,69 @@ ACTpolPointingFit *update_actpol_pointing(mbTOD *tod, actData *dx, actData *dy, 
 
 /*--------------------------------------------------------------------------------*/
 #ifdef ACTPOL
+void precalc_actpol_pointing_exact_subsampled(mbTOD *tod, int downsamp, actData **ra, actData **dec, actData **twogamma)
+{
+  assert(tod);
+  
+  
+  //#pragma omp parallel shared(tod,do_radec,do_2gamma) default(none)
+#pragma omp parallel shared(tod,ra,dec,twogamma,downsamp) default(none)
+  {
+    
+    ACTpolArray *array = ACTpolArray_alloc(tod->ndet);
+    double xcent=0.0;
+    double ycent=0.0;
+
+    ACTpolArray_init(array, tod->actpol_pointing->freq, xcent,ycent);
+    for (int i=0;i<tod->ndet;i++) {
+      ACTpolFeedhorn_init(&(array->horn[i]),tod->actpol_pointing->dx[i],tod->actpol_pointing->dy[i],tod->actpol_pointing->theta[i]);
+    }
+    ACTpolWeather weather;
+    ACTpolWeather_default(&weather);
+    
+    ACTpolArrayCoords *coords = ACTpolArrayCoords_alloc(array);
+    ACTpolArrayCoords_init(coords);
+
+    ACTpolState *state = ACTpolState_alloc();
+    ACTpolState_init(state);
+
+    ACTpolScan scan;
+    ACTpolScan_init(&scan, tod->actpol_pointing->alt0,tod->actpol_pointing->az0,tod->actpol_pointing->az_throw);
+
+    ACTpolArrayCoords_update_refraction(coords, &scan, &weather);
+    
+#pragma omp for
+    for (int i=0;i<tod->ndata;i+=downsamp) {
+      int ii=i/downsamp;
+      actData myctime;
+      if (tod->dt)
+	myctime=tod->dt[i];
+      else
+	myctime=tod->ctime+tod->deltat*(actData)i;
+      
+      ACTpolState_update(state,myctime,tod->alt[i],tod->az[i]);
+      ACTpolArrayCoords_update(coords, state);
+      for (int j=0;j<tod->ndet;j++) {
+	ACTpolFeedhornCoords *fc = &(coords->horn[j]);
+	
+	twogamma[j][ii]=atan2(fc->sin2gamma,fc->cos2gamma);
+	ra[j][ii]=fc->ra;
+	dec[j][ii]=fc->dec;
+      }
+    }
+
+    ACTpolState_free(state);
+    ACTpolArrayCoords_free(coords);
+    ACTpolArray_free(array);
+    
+  }
+  
+  
+}
+#endif
+
+/*--------------------------------------------------------------------------------*/
+#ifdef ACTPOL
 void precalc_actpol_pointing_exact(mbTOD *tod, int op_flag)
 {
   assert(tod);
