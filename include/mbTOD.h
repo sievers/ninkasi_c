@@ -246,6 +246,7 @@ typedef struct {
   mbNoiseVectorStruct *noise;
   mbNoiseVectorStructBands *band_noise;
   mbNoiseStructBandsVecs *band_vecs_noise;
+  
 
 
   actData *noise_amp;

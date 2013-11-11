@@ -516,7 +516,8 @@ void purge_matrix(mbTOD *tod, actData **vec, int nelem, int ngood)
   }
   free(vec[0]);
   actData **crud=(actData **)realloc(vec,sizeof(actData *)*ngood);
-  assert(crud==vec);
+  if (ngood>0) 
+    assert(crud==vec);
 
   for (int i=0;i<ngood;i++)
     vec[i]=tmp[i];
@@ -3536,6 +3537,49 @@ void mapset2mapset(MAPvec *maps, TODvec *tods, PARAMS *params)
   mpi_reduce_mapset(maps);
 #endif
 }
+
+/*--------------------------------------------------------------------------------*/
+void array_detrend(mbTOD *tod, int nsamp)
+{
+  assert(tod->have_data);
+  printf("ndet is %d\n",tod->ndet);
+  actData *left_meds=vector(tod->ndet);
+  actData *right_meds=vector(tod->ndet);
+  actData *delts=vector(tod->ndet);
+#pragma omp parallel shared(tod,nsamp,left_meds,right_meds,delts) default(none)
+  {
+    actData *tmp=vector(nsamp);
+#pragma omp for
+    for (int det=0;det<tod->ndet;det++) {
+      memcpy(tmp,tod->data[det],nsamp*sizeof(actData));
+      left_meds[det]=sselect(nsamp/2,nsamp,tmp-1);
+      memcpy(tmp,tod->data[det]+tod->ndata-nsamp,nsamp*sizeof(actData));
+      right_meds[det]=sselect(nsamp/2,nsamp,tmp-1);
+      delts[det]=right_meds[det]-left_meds[det];
+    }
+    free(tmp);
+  }
+  printf("finished median part.\n");
+
+  actData med_delt=sselect(tod->ndet/2,tod->ndet,delts-1);
+  actData slope=med_delt/(tod->ndata-1.0*nsamp);
+  const actData nn=nsamp/2;
+#pragma omp parallel for shared(tod,slope,left_meds,right_meds) default(none)
+  for (int det=0;det<tod->ndet;det++) {
+    actData myoff=0.5*(left_meds[det]+right_meds[det])-slope*(tod->ndata/2-nn);
+    for (int i=0;i<tod->ndata;i++) {
+      //actData mydelt=(i-nn)*slope+left_meds[det];
+      actData mydelt=i*slope+myoff;
+      tod->data[det][i]-=mydelt;
+    }
+  }
+  
+  
+  free(delts);
+  free(left_meds);
+  free(right_meds);
+}
+
 /*--------------------------------------------------------------------------------*/
 void detrend_data(mbTOD *tod)
 {

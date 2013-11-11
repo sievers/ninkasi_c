@@ -638,8 +638,10 @@ static int ParseFormatFile(ZZIP_FILE* fp, struct FormatType *F, const char* file
           IncludeList, i_include);
       zzip_fclose(new_fp);
     } else {
-      printf("bad format a: %s %s\n", in_cols[0], in_cols[1]);
-      error_code = GD_E_FORMAT;
+      //Commented out by JLS on 9 October 2013 since this is usually due to unsupported POLYNOM, which we don't generally use anyways.
+      //Otherwise can't read actpol data.
+      //printf("bad format a: %s %s\n", in_cols[0], in_cols[1]);
+      //error_code = GD_E_FORMAT;
     }
 
     /* break out of loop (so we can return) if we've encountered an error */

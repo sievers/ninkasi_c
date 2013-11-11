@@ -141,6 +141,8 @@ actData mapset_times_mapset(MAPvec *x, MAPvec *y);
 void remove_common_mode(mbTOD *tod);
 void readwrite_simple_map(MAP *map, char *filename, int dowrite);
 void detrend_data(mbTOD *tod);
+void array_detrend(mbTOD *tod, int nsamp);
+
 void demean_data(mbTOD *tod);
 void cut_tod_ends(mbTOD *tod,actData tcut);
 void set_tod_window(mbTOD *tod,actData tcut);
