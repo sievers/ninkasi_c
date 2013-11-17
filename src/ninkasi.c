@@ -39,6 +39,12 @@
 #include "nk_clapack.h"
 #include "ninkasi_mathutils.h"
 
+
+#ifndef M_SQRT1_2
+#define M_SQRT1_2  0.707106781186548
+#endif
+
+
 #define ALTAZ_PER_LINE 3
 /*--------------------------------------------------------------------------------*/
 void pca_pause(actData pauselen)
@@ -3482,6 +3488,75 @@ void free_tod_storage(mbTOD *tod)
   tod->data=NULL;
 }
 /*--------------------------------------------------------------------------------*/
+void destroy_tod(mbTOD *tod)
+/*free as much of the TOD as we can.*/
+{
+  if (tod->dirfile) {
+    free(tod->dirfile);
+    tod->dirfile=NULL; 
+  }
+  if (tod->dt) {
+    free(tod->dt);
+    tod->dt=NULL;
+  }
+  if (tod->az) {
+    free(tod->az);
+    tod->az=NULL;
+  }
+  if (tod->alt) {
+    free(tod->alt);
+    tod->alt=NULL;
+  }
+  if (tod->ra) {
+    free(tod->ra);
+    tod->ra=NULL;
+  }
+  if (tod->dec) {
+    free(tod->dec);
+    tod->dec=NULL;
+  }
+  if (tod->calib_facs_saved) {
+    free(tod->calib_facs_saved[0]);
+    free(tod->calib_facs_saved);
+    tod->calib_facs_saved=NULL;
+  }
+  if (tod->corrs) {
+    free(tod->corrs[0]);
+    free(tod->corrs);
+    tod->corrs=NULL;
+  }
+  if (tod->rotmat) {
+    free(tod->rotmat[0]);
+    free(tod->rotmat);
+    tod->rotmat=NULL;
+  }
+  if (tod->rows) {
+    free(tod->rows);
+    tod->rows=NULL;
+  }
+  if (tod->cols) {
+    free(tod->cols);
+    tod->cols=NULL;
+  }
+  if (tod->dets) {
+    free(tod->dets[0]);
+    free(tod->dets);
+    tod->dets=NULL;
+  }
+  //should free cuts here
+  //should free pointing fits here.
+
+  if (tod->paired_detectors) {
+    free(tod->paired_detectors);
+    tod->paired_detectors=NULL;
+  }
+  if (tod->hwp) {
+    free(tod->hwp);
+    tod->hwp=NULL;
+  }
+}
+
+/*--------------------------------------------------------------------------------*/
 void rotate_matrix(actData **mat1, actData **mat2, bool do_transpose)
 {
   
@@ -4534,7 +4609,31 @@ void get_data_corrs(mbTOD *tod)
 #endif
 
 }
-
+/*--------------------------------------------------------------------------------*/
+void rotate_data_detpairs(mbTOD *tod)
+//rotate into the sum and difference of detector pairs.  With appropriate normalization, operation is symmetric
+{
+  return;
+  assert(tod);
+  assert(tod->have_data);
+  if (!tod->paired_detectors)
+    return;
+  //printf("checking out %d detectors.\n",tod->ndata);
+#pragma omp parallel for shared(tod) default(none) schedule(dynamic,4)
+  for (int det=0;det<tod->ndet;det++) {
+    //only rotate if I'm the lower-ranked detector of the pair.  also means if you have -1 as the detector pair, nothing happens
+    if (tod->paired_detectors[det]>det) {
+      int det2=tod->paired_detectors[det];
+      //printf("unwinding %d %d\n",det,det2);
+      for (int i=0;i<tod->ndata;i++) {
+	actData tmp=tod->data[det][i]+tod->data[det2][i];
+	actData tmp2=tod->data[det][i]-tod->data[det2][i];
+	tod->data[det][i]=tmp*M_SQRT1_2;
+	tod->data[det2][i]=tmp2*M_SQRT1_2;
+	}
+    }
+  }
+}
 /*--------------------------------------------------------------------------------*/
  void rotate_data(mbTOD *tod, char trans, actData *rotmat)
    /*

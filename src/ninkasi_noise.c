@@ -1941,15 +1941,32 @@ void apply_noise(mbTOD *tod)
     fprintf(stderr,"Warning - no data found when attempting to apply model in apply_noise.\n");
     return;
   }
+
+  
+  printf("inside apply_noise.\n");
   if (tod->band_vecs_noise) {
-      apply_banded_projvec_noise_model(tod);
-      return;
+    printf("applying noise.\n");
+    //rotate_data_detpairs(tod);
+    printf("rotated.\n");
+    apply_banded_projvec_noise_model(tod);
+    printf("applied.\n");
+    //rotate_data_detpairs(tod);
+    printf("done and headed home.\n");
+    return;
     }
   if (tod->band_noise) {
+    printf("applying band_noise.\n");
+    rotate_data_detpairs(tod);
+    printf("rotated.\n");
     apply_banded_noise_model(tod);
+    printf("applied.\n");
+    rotate_data_detpairs(tod);
+    printf("done.\n");
     return;
   }
   if (tod->noise) {
+    printf("inside with tod->noise.\n");
+    rotate_data_detpairs(tod);
     actComplex **data_ft=fft_all_data(tod);
 
 #pragma omp parallel for shared(tod,data_ft) default(none)
@@ -1960,6 +1977,7 @@ void apply_noise(mbTOD *tod)
     ifft_all_data(tod,data_ft);
     free(data_ft[0]);
     free(data_ft);
+    rotate_data_detpairs(tod);
     return;    
   }
   printf("Skipping noise application since no noise model found.\n");  

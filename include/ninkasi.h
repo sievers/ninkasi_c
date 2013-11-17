@@ -202,6 +202,8 @@ void allocate_tod_storage(mbTOD *tod);
 void tod2mapset(MAPvec *maps, mbTOD *tod, PARAMS *params);
 void assign_tod_value(mbTOD *tod, actData val);
 void free_tod_storage(mbTOD *tod);
+void destroy_tod(mbTOD *tod);
+
 void map2det_scaled(const MAP *map, const mbTOD *tod, actData *vec, actData scale_fac, int *ind, int det, PointingFitScratch *scratch);
 
 int get_map_poltag(const MAP *map);
@@ -252,6 +254,7 @@ void clear_cut_data(mbTOD *tod);
 void reverse_tod_data(mbTOD *tod);
 
 void get_data_corrs(mbTOD *tod);
+void rotate_data_detpairs(mbTOD *tod);
 void rotate_data(mbTOD *tod, char trans, actData *rotmat);
 void multiply_all_data(mbTOD *tod,actData val);
 

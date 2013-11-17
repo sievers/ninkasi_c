@@ -246,7 +246,7 @@ typedef struct {
   mbNoiseVectorStruct *noise;
   mbNoiseVectorStructBands *band_noise;
   mbNoiseStructBandsVecs *band_vecs_noise;
-  
+  int *paired_detectors; //if we have a matched detector, put it here.
 
 
   actData *noise_amp;
