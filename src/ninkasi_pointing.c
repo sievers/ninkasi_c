@@ -20,6 +20,8 @@
 
 #ifdef ACTPOL
 #include <actpol/actpol.h>
+
+//#define ACTPOL_NEW
 #endif
 
 //#define OLD_POINTING_OFFSET
@@ -1505,7 +1507,11 @@ void precalc_actpol_pointing_exact_subsampled(mbTOD *tod, int downsamp, actData 
     ACTpolWeather_default(&weather);
     
     ACTpolArrayCoords *coords = ACTpolArrayCoords_alloc(array);
+#ifdef ACTPOL_NEW
+    ACTpolArrayCoords_init(coords,ACTPOL_COORDSYS_RA_DEC);
+#else
     ACTpolArrayCoords_init(coords);
+#endif
 
     ACTpolState *state = ACTpolState_alloc();
     ACTpolState_init(state);
@@ -1530,8 +1536,13 @@ void precalc_actpol_pointing_exact_subsampled(mbTOD *tod, int downsamp, actData 
 	ACTpolFeedhornCoords *fc = &(coords->horn[j]);
 	
 	twogamma[j][ii]=atan2(fc->sin2gamma,fc->cos2gamma);
+#ifdef ACTPOL_NEW
+	ra[j][ii]=fc->a;
+	dec[j][ii]=acos(fc->b);
+#else
 	ra[j][ii]=fc->ra;
 	dec[j][ii]=fc->dec;
+#endif
       }
     }
 
@@ -1617,16 +1628,29 @@ void precalc_actpol_pointing_exact(mbTOD *tod, int op_flag)
     ACTpolWeather_default(&weather);
     
     ACTpolArrayCoords *coords = ACTpolArrayCoords_alloc(array);
+#ifdef ACTPOL_NEW
+    ACTpolArrayCoords_init(coords,ACTPOL_COORDSYS_RA_DEC);
+#else
     ACTpolArrayCoords_init(coords);
+#endif
+
 
     ACTpolState *state = ACTpolState_alloc();
     ACTpolState_init(state);
 
     ACTpolScan scan;
+#if 1
+    tod->actpol_pointing->alt0=0.8446;
+    tod->actpol_pointing->az0=5.204;
+    tod->actpol_pointing->az_throw=0.1307;
+#endif
+
+    printf("various points are %12.4g %12.4g %12.4g\n",tod->actpol_pointing->alt0,tod->actpol_pointing->az0,tod->actpol_pointing->az_throw);
     ACTpolScan_init(&scan, tod->actpol_pointing->alt0,tod->actpol_pointing->az0,tod->actpol_pointing->az_throw);
 
     ACTpolArrayCoords_update_refraction(coords, &scan, &weather);
-    
+    printf("updated refraction.\n");
+
 #pragma omp for
     for (int i=0;i<tod->ndata;i++) {
       actData myctime;
@@ -1658,8 +1682,13 @@ void precalc_actpol_pointing_exact(mbTOD *tod, int op_flag)
       if (do_radec) {
 	for (int j=0;j<tod->ndet;j++) {
 	  ACTpolFeedhornCoords *fc = &(coords->horn[j]);
+#ifdef ACTPOL_NEW
+	  tod->ra_saved[j][i]=fc->a;
+	  tod->dec_saved[j][i]=acos(fc->b);
+#else
 	  tod->ra_saved[j][i]=fc->ra;
 	  tod->dec_saved[j][i]=fc->dec;
+#endif
 	  
 	}
       }
@@ -1758,7 +1787,11 @@ void find_tod_radec_lims_actpol_pointing_exact(mbTOD *tod,actData rawrap)
     ACTpolWeather_default(&weather);
     
     ACTpolArrayCoords *coords = ACTpolArrayCoords_alloc(array);
+#ifdef ACTPOL_NEW
+    ACTpolArrayCoords_init(coords,ACTPOL_COORDSYS_RA_DEC);
+#else
     ACTpolArrayCoords_init(coords);
+#endif
 
     ACTpolState *state = ACTpolState_alloc();
     ACTpolState_init(state);
@@ -1785,8 +1818,13 @@ void find_tod_radec_lims_actpol_pointing_exact(mbTOD *tod,actData rawrap)
       ACTpolArrayCoords_update(coords, state);
       for (int j=0;j<tod->ndet;j++) {
         ACTpolFeedhornCoords *fc = &(coords->horn[j]);
+#ifdef ACTPOL_NEW
+	actData ra=fc->a;
+	actData dec=acos(fc->b);
+#else
 	actData ra=fc->ra;
 	actData dec=fc->dec;
+#endif
 	if (ra>rawrap)
 	  ra-=2*M_PI;
 	if (ra>ramax)
@@ -1848,7 +1886,12 @@ void precalc_actpol_pointing(mbTOD *tod)
     ACTpolScan_init(&scan, fit->alt0,fit->az0,fit->az_throw);
     
     ACTpolArrayCoords *coords = ACTpolArrayCoords_alloc(fit->array);
+#ifdef ACTPOL_NEW
+    ACTpolArrayCoords_init(coords,ACTPOL_COORDSYS_RA_DEC);
+#else
     ACTpolArrayCoords_init(coords);
+#endif
+
     ACTpolArrayCoords_update_refraction(coords, &scan, &(fit->weather));
     
     ACTpolState *state = ACTpolState_alloc();
@@ -1863,12 +1906,21 @@ void precalc_actpol_pointing(mbTOD *tod)
       //printf("isamp is %d of %d\n",isamp,tod->ndata);
       actData myctime=tod->ctime+(isamp)*tod->deltat;      
       ACTpolState_update(state, myctime, tod->alt[isamp],tod->az[isamp]);
+#ifdef ACTPOL_NEW
+      ACTpolArrayCoords_update(coords, state);
+#else
       ACTpolArrayCoords_update_fast(coords, state);
+#endif
       for (int k=0;k<tod->ndet;k++) {
 	
 	ACTpolFeedhornCoords *fc = coords->horn + k;
+#ifdef ACTPOL_NEW
+	fit->ra_piv[k][i]=fc->a;
+	fit->dec_piv[k][i]=sin(acos(fc->b));
+#else
 	fit->ra_piv[k][i]=fc->ra;
 	fit->dec_piv[k][i]=fc->sindec;
+#endif
 	fit->sin2gamma_piv[k][i]=fc->sin2gamma;
 	fit->cos2gamma_piv[k][i]=fc->cos2gamma;
 	
@@ -1966,7 +2018,11 @@ void get_radec_from_altaz_actpol_c(double *az, double *el, double *tvec, double 
 
 
     ACTpolArrayCoords *coords = ACTpolArrayCoords_alloc(array);
+#ifdef ACTPOL_NEW
+    ACTpolArrayCoords_init(coords,ACTPOL_COORDSYS_RA_DEC);
+#else
     ACTpolArrayCoords_init(coords);
+#endif
 
     ACTpolState *state = ACTpolState_alloc();
     ACTpolState_init(state);
@@ -1981,8 +2037,13 @@ void get_radec_from_altaz_actpol_c(double *az, double *el, double *tvec, double 
       ACTpolArrayCoords_update(coords, state);
       for (int j=0;j<nhorns;j++) {
         ACTpolFeedhornCoords *fc = &(coords->horn[j]);
+#ifdef ACTPOL_NEW
+	ra[i*nhorns+j]=fc->a;
+        dec[i*nhorns+j]=acos(fc->b);
+#else
 	ra[i*nhorns+j]=fc->ra;
         dec[i*nhorns+j]=fc->dec;
+#endif
         //sin2gamma[i+j*nelem]=fc->sin2gamma;
         //cos2gamma[i+j*nelem]=fc->cos2gamma;
       }      
