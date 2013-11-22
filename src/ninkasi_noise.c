@@ -1943,25 +1943,25 @@ void apply_noise(mbTOD *tod)
   }
 
   
-  printf("inside apply_noise.\n");
+  //printf("inside apply_noise.\n");
   if (tod->band_vecs_noise) {
-    printf("applying noise.\n");
+    //printf("applying noise.\n");
     //rotate_data_detpairs(tod);
-    printf("rotated.\n");
+    //printf("rotated.\n");
     apply_banded_projvec_noise_model(tod);
-    printf("applied.\n");
+    //printf("applied.\n");
     //rotate_data_detpairs(tod);
-    printf("done and headed home.\n");
+    //printf("done and headed home.\n");
     return;
     }
   if (tod->band_noise) {
-    printf("applying band_noise.\n");
+    //printf("applying band_noise.\n");
     rotate_data_detpairs(tod);
-    printf("rotated.\n");
+    //printf("rotated.\n");
     apply_banded_noise_model(tod);
-    printf("applied.\n");
+    //printf("applied.\n");
     rotate_data_detpairs(tod);
-    printf("done.\n");
+    //printf("done.\n");
     return;
   }
   if (tod->noise) {
