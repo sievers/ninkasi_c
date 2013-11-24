@@ -170,7 +170,7 @@ typedef struct {
   int ndark;           //!< # of dark or dead detectors 
   int ndet;            //!< # of detectors 
   int ndata;           //!< number of data points
-  //int start_offset;    //   shift the data by this amount vs. the TOD.
+  int start_offset;    //   shift the data by this amount vs. the TOD.
   int ndet_alloc;      //!< number of detectors allocated
   int ndata_alloc;     //!< number of data points allocated
 

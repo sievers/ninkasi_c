@@ -437,7 +437,7 @@ actData **read_dirfile_tod_data_from_rowcol_list (mbTOD *tod, int *row, int *col
     }
     else
       assert(n==tod->ndata);
-    memcpy(data[idet],chan,sizeof(actData)*tod->ndata);
+    memcpy(data[idet],chan+tod->start_offset,sizeof(actData)*tod->ndata);
     free(chan);
   }
   return data;
