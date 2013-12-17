@@ -21,7 +21,7 @@
 #ifdef ACTPOL
 #include <actpol/actpol.h>
 
-//#define ACTPOL_NEW
+#define ACTPOL_NEW
 #endif
 
 //#define OLD_POINTING_OFFSET
@@ -1538,7 +1538,8 @@ void precalc_actpol_pointing_exact_subsampled(mbTOD *tod, int downsamp, actData 
 	twogamma[j][ii]=atan2(fc->sin2gamma,fc->cos2gamma);
 #ifdef ACTPOL_NEW
 	ra[j][ii]=fc->a;
-	dec[j][ii]=acos(fc->b);
+	//dec[j][ii]=acos(fc->b);
+	dec[j][ii]=(fc->b);
 #else
 	ra[j][ii]=fc->ra;
 	dec[j][ii]=fc->dec;
@@ -1645,11 +1646,9 @@ void precalc_actpol_pointing_exact(mbTOD *tod, int op_flag)
     tod->actpol_pointing->az_throw=0.1307;
 #endif
 
-    printf("various points are %12.4g %12.4g %12.4g\n",tod->actpol_pointing->alt0,tod->actpol_pointing->az0,tod->actpol_pointing->az_throw);
     ACTpolScan_init(&scan, tod->actpol_pointing->alt0,tod->actpol_pointing->az0,tod->actpol_pointing->az_throw);
 
     ACTpolArrayCoords_update_refraction(coords, &scan, &weather);
-    printf("updated refraction.\n");
 
 #pragma omp for
     for (int i=0;i<tod->ndata;i++) {
@@ -1684,7 +1683,8 @@ void precalc_actpol_pointing_exact(mbTOD *tod, int op_flag)
 	  ACTpolFeedhornCoords *fc = &(coords->horn[j]);
 #ifdef ACTPOL_NEW
 	  tod->ra_saved[j][i]=fc->a;
-	  tod->dec_saved[j][i]=acos(fc->b);
+	  //tod->dec_saved[j][i]=acos(fc->b);
+	  tod->dec_saved[j][i]=(fc->b);
 #else
 	  tod->ra_saved[j][i]=fc->ra;
 	  tod->dec_saved[j][i]=fc->dec;
@@ -1820,7 +1820,8 @@ void find_tod_radec_lims_actpol_pointing_exact(mbTOD *tod,actData rawrap)
         ACTpolFeedhornCoords *fc = &(coords->horn[j]);
 #ifdef ACTPOL_NEW
 	actData ra=fc->a;
-	actData dec=acos(fc->b);
+	//actData dec=acos(fc->b);
+	actData dec=(fc->b);
 #else
 	actData ra=fc->ra;
 	actData dec=fc->dec;
@@ -1916,7 +1917,8 @@ void precalc_actpol_pointing(mbTOD *tod)
 	ACTpolFeedhornCoords *fc = coords->horn + k;
 #ifdef ACTPOL_NEW
 	fit->ra_piv[k][i]=fc->a;
-	fit->dec_piv[k][i]=sin(acos(fc->b));
+	//fit->dec_piv[k][i]=sin(acos(fc->b));
+	fit->dec_piv[k][i]=sin((fc->b));
 #else
 	fit->ra_piv[k][i]=fc->ra;
 	fit->dec_piv[k][i]=fc->sindec;
@@ -2039,7 +2041,8 @@ void get_radec_from_altaz_actpol_c(double *az, double *el, double *tvec, double 
         ACTpolFeedhornCoords *fc = &(coords->horn[j]);
 #ifdef ACTPOL_NEW
 	ra[i*nhorns+j]=fc->a;
-        dec[i*nhorns+j]=acos(fc->b);
+        //dec[i*nhorns+j]=acos(fc->b);
+        dec[i*nhorns+j]=(fc->b);
 #else
 	ra[i*nhorns+j]=fc->ra;
         dec[i*nhorns+j]=fc->dec;

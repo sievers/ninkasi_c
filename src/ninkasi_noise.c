@@ -1289,7 +1289,6 @@ actData *get_freq_vec(mbTOD *tod)
   return vec;
 }
 
-
 /*--------------------------------------------------------------------------------*/
 void allocate_tod_noise_bands(mbTOD *tod,actData *bands, int nband)
 {
