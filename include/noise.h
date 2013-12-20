@@ -82,6 +82,7 @@ int get_demodulated_hwp_data(mbTOD *tod, actData hwp_freq, actComplex **tdata,ac
 int remodulate_hwp_data(mbTOD *tod, actData hwp_freq, actComplex **tdata,actComplex **poldata);
 actData get_hwp_freq(mbTOD *tod);
 void demodulate_data(mbTOD *tod, DemodData *demod);
+void remodulate_data(mbTOD *tod, DemodData *demod);
 void destroy_demod_data(DemodData *demod);
 void free_demod_data(DemodData *demod);
 int get_demod_nchannel(DemodData *demod);

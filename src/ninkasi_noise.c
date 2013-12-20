@@ -2572,7 +2572,7 @@ void demodulate_data(mbTOD *tod, DemodData *demod)
   fftw_plan plan_c2r=fftw_plan_dft_c2r_1d(tod->ndata,ctmp,tmp,FFTW_ESTIMATE);
   fftw_free(tmp);
   fftw_free(ctmp);
-  printf("plans are made.\n");
+  //printf("plans are made.\n");
 #pragma omp parallel shared(tod,demod,plan_r2c,plan_c2r,nchan,dnu) default(none)
   {
     double *tmp=(double *)fftw_malloc(tod->ndata*sizeof(double));  
@@ -2587,10 +2587,15 @@ void demodulate_data(mbTOD *tod, DemodData *demod)
       fftw_execute_dft_r2c(plan_r2c,tod->data[det],ctmp);
       //printf("did first fft.\n");
       memcpy(demod->data[dd],ctmp,demod->nmode*sizeof(actComplex));
+
       memset(ctmp,0,demod->nmode*sizeof(actComplex));
       if (demod->highpass_freq>0) {
 	int istart=demod->highpass_freq/dnu;
 	memset(ctmp+istart,0,(tod->ndata-istart)*sizeof(actComplex));
+      }
+      if (demod->lowpass_freq>0) {
+	int istop=demod->lowpass_freq/dnu;
+	memset(ctmp,0,istop*sizeof(actComplex));
       }
       
       fftw_execute_dft_c2r(plan_c2r,ctmp,tmp);
@@ -2616,8 +2621,93 @@ void demodulate_data(mbTOD *tod, DemodData *demod)
     //printf("freed.\n");
   }
   
+  fftw_destroy_plan(plan_c2r);
+  fftw_destroy_plan(plan_r2c);
 
   fftw_plan_with_nthreads(omp_get_max_threads());
   //printf("replanned.\n");
   
+}
+
+/*--------------------------------------------------------------------------------*/
+void remodulate_data(mbTOD *tod, DemodData *demod)
+{
+  actData dnu=1.0/(tod->deltat*tod->ndata);
+  int nchan=get_demod_nchannel(demod);
+  if (demod->data==NULL) {
+    fprintf(stderr,"Must have data in remodulate_data.\n");
+    return;
+  }
+  if (tod->data==NULL) {
+    assert(1==0);  //we should have storage here.
+  }
+
+  fftw_plan_with_nthreads(1);
+  double *tmp=(double *)fftw_malloc(tod->ndata*sizeof(double));
+  actComplex *ctmp=(actComplex *)fftw_malloc(tod->ndata*sizeof(actComplex));
+  fftw_plan plan_r2c=fftw_plan_dft_r2c_1d(tod->ndata,tmp,ctmp,FFTW_ESTIMATE);
+  fftw_plan plan_c2r=fftw_plan_dft_c2r_1d(tod->ndata,ctmp,tmp,FFTW_ESTIMATE);
+  fftw_free(tmp);
+  fftw_free(ctmp);
+#pragma omp parallel shared(tod,demod,plan_r2c,plan_c2r,nchan,dnu) default(none)
+  {
+    double *tmp=(double *)fftw_malloc(tod->ndata*sizeof(double));
+    //double *tmp_demod=(double *)fftw_malloc(tod->ndata*sizeof(double));
+    double *accum=(double *)fftw_malloc(tod->ndata*sizeof(double));
+    memset(accum,0,sizeof(double)*tod->ndata);
+    actComplex *ctmp=(actComplex *)fftw_malloc(tod->ndata*sizeof(actComplex));
+    
+    actData normfac=1.0/tod->ndata;
+#pragma omp for
+    for (int det=0;det<tod->ndet;det++) {
+      int dd=det*nchan;
+      for (int ff=0;ff<demod->nfreq;ff++) {
+	memset(ctmp,0,sizeof(actComplex)*tod->ndata);
+	memcpy(ctmp,demod->data[dd+1+2*ff],demod->nmode*sizeof(actComplex));
+	fftw_execute_dft_c2r(plan_c2r,ctmp,tmp);
+	for (int i=0;i<tod->ndata;i++)
+	  accum[i]+=tmp[i]*cos(tod->hwp[i]*demod->freqs[ff]);
+	memcpy(ctmp,demod->data[dd+2+2*ff],demod->nmode*sizeof(actComplex));
+	fftw_execute_dft_c2r(plan_c2r,ctmp,tmp);
+	for (int i=0;i<tod->ndata;i++)
+	  accum[i]+=tmp[i]*sin(tod->hwp[i]*demod->freqs[ff]);
+      }
+      //now apply the bandpass
+      fftw_execute_dft_r2c(plan_r2c,accum,ctmp);
+      memset(ctmp,0,demod->nmode*sizeof(actComplex));
+      if (demod->highpass_freq>0) {
+        int istart=demod->highpass_freq/dnu;
+        memset(ctmp+istart,0,(tod->ndata-istart)*sizeof(actComplex));
+      }
+      if (demod->lowpass_freq>0) {
+        int istop=demod->lowpass_freq/dnu;
+        memset(ctmp,0,istop*sizeof(actComplex));
+      }
+      
+      //scale the data by FFT norm factor.  We've picked up one copy in the filter, will pick up another in the IFFT, so put in two here.
+      //to save time, don't apply normfac to data above the high frequency cutoff
+      int imax=tod->ndata;
+      if (demod->highpass_freq>0)
+	imax=demod->highpass_freq/dnu;
+      for (int i=0;i<imax;i++)
+	ctmp[i]*=normfac*normfac;
+      //now add in the I part of the demod data.  need one copy of normfac here.
+      for (int i=0;i<demod->nmode;i++)
+	ctmp[i]+=normfac*demod->data[dd][i];
+      fftw_execute_dft_c2r(plan_c2r,ctmp,tmp);
+      for (int i=0;i<tod->ndata;i++)
+	tod->data[det][i]+=tmp[i];
+    }
+    fftw_free(tmp);
+    fftw_free(ctmp);
+    fftw_free(accum);
+
+    
+    
+  }
+  fftw_destroy_plan(plan_c2r);
+  fftw_destroy_plan(plan_r2c);
+  fftw_plan_with_nthreads(omp_get_max_threads());
+
+
 }
