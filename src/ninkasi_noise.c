@@ -1862,11 +1862,39 @@ void apply_banded_noise_complex(mbTOD *tod, actComplex **dat)
   }
 }
 /*--------------------------------------------------------------------------------*/
+void apply_banded_projvec_noise_model_demod(mbTOD *tod)
+{
+  assert(tod);
+  assert(tod->band_vecs_noise);
+  mbNoiseStructBandsVecs *noise=tod->band_vecs_noise;
+  demodulate_data(tod,tod->demod);
+  actComplex **data_ft=tod->demod->data;
+  int ncol=get_demod_nchannel(tod->demod);
+  int ndet_use=tod->ndet*ncol;
+  int nn=tod->demod->nmode;
+  actComplex **data_filt=cmatrix(ndet_use,nn);
+  for (int i=0;i<ndet_use;i++)
+    data_filt[i][0]=0;
+  for (int i=0;i<noise->nband;i++)
+    apply_diag_proj_noise_inv_bands((double **)data_ft, (double **)data_filt, noise->noises[i],noise->vecs[i],2*nn,ndet_use,noise->nvecs[i],2*noise->band_edges[i],2*noise->band_edges[i+1]);
+  memcpy(data_ft,data_filt,nn*ndet_use*sizeof(actComplex));
+  memset(tod->data[0],0,tod->ndet*tod->ndata*sizeof(actData));
+  remodulate_data(tod,tod->demod);
+  free(data_filt[0]);
+  free(data_filt);
+  //actComplex **data_ft=fft_all_data(tod);
+
+}
+/*--------------------------------------------------------------------------------*/
 
 void apply_banded_projvec_noise_model(mbTOD *tod)
 {
   assert(tod);
   assert(tod->band_vecs_noise);
+  if (tod->demod) {
+    apply_banded_projvec_noise_model_demod(tod);
+    return;
+  }
   mbNoiseStructBandsVecs *noise=tod->band_vecs_noise;
   actComplex **data_ft=fft_all_data(tod);
   int nn=get_nn(tod->ndata);
@@ -1947,6 +1975,13 @@ void apply_noise(mbTOD *tod)
     //printf("applying noise.\n");
     //rotate_data_detpairs(tod);
     //printf("rotated.\n");
+    if (tod->demod) {
+      demodulate_data(tod,tod->demod);
+      apply_banded_projvec_noise_model_demod(tod);
+      remodulate_data(tod,tod->demod);
+      free_demod_data(tod->demod);
+      return;
+    }
     apply_banded_projvec_noise_model(tod);
     //printf("applied.\n");
     //rotate_data_detpairs(tod);
@@ -2082,6 +2117,17 @@ void simple_test_diag_proj_noise_inv(actData **data_in, actData **data_out, actD
 /*--------------------------------------------------------------------------------*/
 void apply_diag_proj_noise_inv_bands(actData **data_in, actData **data_out, actData *ninv, actData **vecs, int ndata, int ndet, int nvecs, int imin, int imax)
 {
+  if (nvecs==0) {
+
+#pragma omp parallel for shared(ninv,ndata,ndet,imin,imax,data_out,data_in) default(none)
+    for (int i=0;i<ndet;i++)
+      for (int j=imin;j<imax;j++)
+	data_out[i][j]=data_in[i][j]*ninv[i];
+
+    return;
+    
+  }
+
   actData **ninv_vecs=matrix(nvecs,ndet);
 #pragma omp parallel for shared(nvecs,ninv_vecs,vecs,ninv,ndet) default(none)
   for (int i=0;i<nvecs;i++) {
@@ -2511,6 +2557,7 @@ void set_demod_freqs(DemodData *demod, actData *freqs, int nfreq)
   }
   
 }
+
 /*--------------------------------------------------------------------------------*/
 void free_demod_data(DemodData *demod)
 {
@@ -2562,9 +2609,10 @@ void demodulate_data(mbTOD *tod, DemodData *demod)
   if (demod->data==NULL)  {
     printf("allocating storage in demodulate_data.\n");
     demod->data=cmatrix(tod->ndet*nchan,demod->nmode);
+
   }
 
-  fftw_plan_with_nthreads(1);
+  //fftw_plan_with_nthreads(1);
 
   double *tmp=(double *)fftw_malloc(tod->ndata*sizeof(double));  
   actComplex *ctmp=(actComplex *)fftw_malloc(tod->ndata*sizeof(actComplex));
@@ -2573,7 +2621,7 @@ void demodulate_data(mbTOD *tod, DemodData *demod)
   fftw_free(tmp);
   fftw_free(ctmp);
   //printf("plans are made.\n");
-#pragma omp parallel shared(tod,demod,plan_r2c,plan_c2r,nchan,dnu) default(none)
+  //#pragma omp parallel shared(tod,demod,plan_r2c,plan_c2r,nchan,dnu) default(none)
   {
     double *tmp=(double *)fftw_malloc(tod->ndata*sizeof(double));  
     double *tmp_demod=(double *)fftw_malloc(tod->ndata*sizeof(double));  
@@ -2599,17 +2647,20 @@ void demodulate_data(mbTOD *tod, DemodData *demod)
       }
       
       fftw_execute_dft_c2r(plan_c2r,ctmp,tmp);
+      //printf("detector %d has element 1000 %14.6g\n",det,tmp[1000]);
       //printf("did second fft.\n");
       for (int ff=0;ff<demod->nfreq;ff++) {
 	//printf("ff is %d of %d\n",ff,demod->nfreq);
 	for (int i=0;i<tod->ndata;i++)
 	  tmp_demod[i]=tmp[i]*cos(tod->hwp[i]*demod->freqs[ff])*normfac;
 	fftw_execute_dft_r2c(plan_r2c,tmp_demod,ctmp);
+	//printf("detector %d has cos element 0 %14.6g %14.6g\n",det,ctmp[0][0],ctmp[0][1]);
 	memcpy(demod->data[dd+1+2*ff],ctmp,demod->nmode*sizeof(actComplex));
 
 	for (int i=0;i<tod->ndata;i++)
 	  tmp_demod[i]=tmp[i]*sin(tod->hwp[i]*demod->freqs[ff])*normfac;
 	fftw_execute_dft_r2c(plan_r2c,tmp_demod,ctmp);
+	//printf("detector %d has sin element 0 %14.6g \n",det,ctmp[0]);
 	memcpy(demod->data[dd+2+2*ff],ctmp,demod->nmode*sizeof(actComplex));	
       }
     }
@@ -2624,7 +2675,7 @@ void demodulate_data(mbTOD *tod, DemodData *demod)
   fftw_destroy_plan(plan_c2r);
   fftw_destroy_plan(plan_r2c);
 
-  fftw_plan_with_nthreads(omp_get_max_threads());
+  //fftw_plan_with_nthreads(omp_get_max_threads());
   //printf("replanned.\n");
   
 }

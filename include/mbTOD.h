@@ -262,6 +262,7 @@ typedef struct {
   ACTpolPointingFit *actpol_pointing;
   actData *hwp;
   actData **twogamma_saved;
+  DemodData *demod;
 #endif
 
   PointingFit *pointing_fit;  //pointing fit, turn alt/az into ra/dec
