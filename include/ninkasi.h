@@ -217,6 +217,8 @@ void tod2polmap(MAP *map,mbTOD *tod);
 void tod2polmap_copy(MAP *map,mbTOD *tod);
 int *tod2map_actpol(MAP *map, mbTOD *tod, int *ipiv_proc);
 
+void ground2tod(MAP *map, mbTOD *tod);
+void tod2ground(MAP *map, mbTOD *tod);
 
 actData tod_times_map(const MAP *map, const mbTOD *tod, PARAMS *params);
 
@@ -271,6 +273,9 @@ void tod2srcvec(actData *src_amp_out,mbTOD *tod, actData *ra_in, actData *dec_in
 void find_map_index_limits(MAP *map, mbTOD *tod, int *imin_out, int *imax_out);
 void invert_pol_precon(MAP *map);
 void apply_pol_precon(MAP *map, MAP *precon);
+
+
+
 
 //from ninkasi_projection
 //void get_map_projection(const mbTOD *tod, const MAP *map, int det, int *ind, PointingFitScratch *scratch);

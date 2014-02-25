@@ -97,4 +97,24 @@ struct mapvec_struct_s {
 typedef struct mapvec_struct_s MAPvec;
 
 
+/*--------------------------------------------------------------------------------*/
+struct modelvec_params_struct_s {
+  int *tod_map;  //maps tods to the set of fit parameters
+  int do_i_reduce;  //if true, this model set will have to get reduced
+  int n_unique_params;  //number of distinct parameter sets
+  int n_unique_dets;  //number of distinct detector sets.  potentially smaller than # of detectors
+                      //if solving for e.g. things that are a function of detector angle only
+  int **det_map;
+  actData ***fitp;    //big fit parameters.  First index is  over distinct TOD classes, second over distinct detector classes
+  void *bonus_params;  //other stuff that one may want
+  void  (*model2tod)(void*, mbTOD *);
+  void  (*tod2model)(mbTOD *, void*);
+
+
+} modelvec_params_struct;
+typedef struct modelvec_params_struct_s modelvecParams;
+
+  
+
+
 #endif

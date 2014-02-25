@@ -3993,8 +3993,9 @@ int make_initial_mapset(MAPvec *maps, TODvec *tods,PARAMS *params)
 void map_axpy(MAP *y, MAP *x, actData a)
 {
   assert(x->npix==y->npix);
-#pragma omp parallel for shared(x,y,a) default(none)  
-  for (int i=0;i<x->npix;i++) {
+  int npix=x->npix*get_npol_in_map(x);
+#pragma omp parallel for shared(x,y,a,npix) default(none)  
+  for (int i=0;i<npix;i++) {
     y->map[i]=y->map[i]+x->map[i]*a;    
   }
 }
@@ -4010,8 +4011,9 @@ actData map_times_map(MAP *x, MAP *y)
 {
   assert(x->npix==y->npix);
   double tot=0;
-#pragma omp parallel for shared(x,y) reduction(+:tot) default(none)
-  for (int i=0;i<x->npix;i++)
+  int npix=x->npix*get_npol_in_map(x);
+#pragma omp parallel for shared(x,y,npix) reduction(+:tot) default(none)
+  for (int i=0;i<npix;i++)
     tot += x->map[i]*y->map[i];
 
   return (actData)tot;
@@ -4758,5 +4760,212 @@ void apply_pol_precon(MAP *map, MAP *precon)
       printf("Don't have polarization written up in apply_pol_precon.  You probably have some coding to do.\n");
       break;
     }
+  }
+}
+
+/*--------------------------------------------------------------------------------*/
+void get_max_rowcol(mbTOD **tods, int ntod, int *mymaxrow, int *mymaxcol)
+{
+  *mymaxrow=0;
+  *mymaxcol=0;
+  for (int ii=0;ii<ntod;ii++) {
+    mbTOD *tod=tods[ii];
+    if (tod->nrow>*mymaxrow)
+      *mymaxrow=tod->nrow;
+    if (tod->ncol>*mymaxcol)
+      *mymaxcol=tod->ncol;
+  }
+  int maxrow,maxcol;
+  MPI_Allreduce(mymaxrow,&maxrow,1,MPI_INT,MPI_MAX,MPI_COMM_WORLD);
+  MPI_Allreduce(mymaxcol,&maxcol,1,MPI_INT,MPI_MAX,MPI_COMM_WORLD);
+  *mymaxrow=maxrow;
+  *mymaxcol=maxcol;
+}
+
+/*--------------------------------------------------------------------------------*/
+modelvecParams *init_ground(mbTOD **tods,int ntod, int nset_unique,int *tod_map, int **det_map, actData daz)
+{
+  modelvecParams *params=(modelvecParams *) malloc(sizeof(modelvecParams));
+  int max_row,max_col;
+  get_max_rowcol(tods,ntod,&max_row,&max_col);
+
+  int naz=(360.0/daz)+1;  //bonus plus one just to make sure we're padded
+  if (!tod_map) { //do this if you want every TOD treated separately
+    params->det_map=imatrix(max_row,max_col);
+  }
+  
+    
+  
+
+  return params;
+}
+
+/*--------------------------------------------------------------------------------*/
+void ground2tod(MAP *map, mbTOD *tod)
+{
+  assert(tod->data);
+  if (!tod->uncuts) {
+    fprintf(stderr,"Missing uncuts in ground2tod.\n");
+    return;
+    assert(tod->uncuts);
+  }
+  
+  const int poltag=get_map_poltag(map);
+  if (poltag==POL_ERROR) {
+    fprintf(stderr,"Error - unrecognized combination in ground2tod.\n");
+    return;
+  }
+
+#pragma omp parallel shared(map,tod) default(none)
+  {
+    int imin=1e6;
+    int imax=-1e6;
+
+    #pragma omp for
+    for (int det=0;det<tod->ndet;det++) {
+      int row=tod->rows[det];
+      int col=tod->cols[det];
+      mbUncut *uncut=tod->uncuts[row][col];
+      actData mydaz=tod->actpol_pointing->dx[det];
+      actData mydel=tod->actpol_pointing->dy[det];
+      switch(poltag) {
+      case POL_I:
+        for (int region=0;region<uncut->nregions;region++) 
+	  for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++) {
+	    actData myaz=tod->az[j]+mydaz;
+	    actData myel=tod->alt[j]+mydel;
+	    int azpix=(myaz-map->ramin)/map->pixsize;
+	    int elpix=(myel-map->decmin)/map->pixsize;
+	    tod->data[det][j]+=map->map[azpix+elpix*map->nx];
+	  }
+	break;
+      case POL_IQU: 
+	{
+	  actData mycos=cos(2*tod->actpol_pointing->theta[det]);
+	  actData mysin=sin(2*tod->actpol_pointing->theta[det]);
+	  for (int region=0;region<uncut->nregions;region++) 	  
+	    for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++) {
+	      actData myaz=tod->az[j]+mydaz;
+	      actData myel=tod->alt[j]+mydel;
+	      int azpix=(myaz-map->ramin)/map->pixsize;
+	      int elpix=(myel-map->decmin)/map->pixsize;
+	      int mypix=3*(azpix+elpix*map->nx);
+	      tod->data[det][j]+=map->map[mypix]+mycos*map->map[mypix+1]+mysin*map->map[mypix+2];
+	    }
+	}
+	break;
+      case POL_IQU_PRECON:
+	{
+	  actData mycos=cos(2*tod->actpol_pointing->theta[det]);
+          actData mysin=sin(2*tod->actpol_pointing->theta[det]);
+          for (int region=0;region<uncut->nregions;region++)
+            for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++) {
+              actData myaz=tod->az[j]+mydaz;
+              actData myel=tod->alt[j]+mydel;
+              int azpix=(myaz-map->ramin)/map->pixsize;
+              int elpix=(myel-map->decmin)/map->pixsize;
+              int mypix=6*(azpix+elpix*map->nx);
+	      tod->data[det][j]+= map->map[mypix]+ map->map[mypix+1]*mycos+ map->map[mypix+2]*mysin+ map->map[mypix+3]*mycos*mycos+ map->map[mypix+4]*mycos*mysin+ map->map[mypix+5]*mysin*mysin;
+	    }
+	}
+
+      default:
+	printf("Unsupported polarization in ground2tod.\n");
+	assert(1==0);
+      }
+    }
+  }
+}
+/*--------------------------------------------------------------------------------*/
+void tod2ground(MAP *map, mbTOD *tod)
+{
+  assert(tod->data);
+  if (!tod->uncuts) {
+    fprintf(stderr,"Missing uncuts in tod2ground.\n");
+    return;
+    assert(tod->uncuts);
+  }
+  
+  const int poltag=get_map_poltag(map);
+  if (poltag==POL_ERROR) {
+    fprintf(stderr,"Error - unrecognized combination in tod2ground.\n");
+    return;
+  }
+
+#pragma omp parallel shared(map,tod) default(none)
+  {
+    int npix=map->nx*map->ny*get_npol_in_map(map);
+    printf("npix is %d\n",npix);
+    actData *mymap=vector(npix);
+    memset(mymap,0,npix*sizeof(actData));
+    
+    
+#pragma omp for
+    for (int det=0;det<tod->ndet;det++) {
+      int row=tod->rows[det];
+      int col=tod->cols[det];
+      mbUncut *uncut=tod->uncuts[row][col];
+      actData mydaz=tod->actpol_pointing->dx[det];
+      actData mydel=tod->actpol_pointing->dy[det];
+      switch(poltag) {
+      case POL_I:
+        for (int region=0;region<uncut->nregions;region++) 
+	  for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++) {
+	    actData myaz=tod->az[j]+mydaz;
+	    actData myel=tod->alt[j]+mydel;
+	    int azpix=(myaz-map->ramin)/map->pixsize;
+	    int elpix=(myel-map->decmin)/map->pixsize;
+	    mymap[azpix+elpix*map->nx]+=tod->data[det][j];
+	  }
+	break;
+      case POL_IQU: 
+	{
+	  actData mycos=cos(2*tod->actpol_pointing->theta[det]);
+	  actData mysin=sin(2*tod->actpol_pointing->theta[det]);
+	  for (int region=0;region<uncut->nregions;region++) 	  
+	    for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++) {
+	      actData myaz=tod->az[j]+mydaz;
+	      actData myel=tod->alt[j]+mydel;
+	      int azpix=(myaz-map->ramin)/map->pixsize;
+	      int elpix=(myel-map->decmin)/map->pixsize;
+	      int mypix=3*(azpix+elpix*map->nx);
+	      mymap[mypix]+=tod->data[det][j];
+	      mymap[mypix+1]+=tod->data[det][j]*mycos;
+	      mymap[mypix+2]+=tod->data[det][j]*mysin;
+	    }
+	}
+	break;
+      case POL_IQU_PRECON:
+	{
+	  actData mycos=cos(2*tod->actpol_pointing->theta[det]);
+          actData mysin=sin(2*tod->actpol_pointing->theta[det]);
+          for (int region=0;region<uncut->nregions;region++)
+            for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++) {
+              actData myaz=tod->az[j]+mydaz;
+              actData myel=tod->alt[j]+mydel;
+              int azpix=(myaz-map->ramin)/map->pixsize;
+              int elpix=(myel-map->decmin)/map->pixsize;
+              int mypix=6*(azpix+elpix*map->nx);
+	      mymap[mypix]+=tod->data[det][j];
+	      mymap[mypix+1]+=tod->data[det][j]*mycos;
+	      mymap[mypix+2]+=tod->data[det][j]*mysin;
+	      mymap[mypix+3]+=tod->data[det][j]*mycos*mycos;
+	      mymap[mypix+4]+=tod->data[det][j]*mycos*mysin;
+	      mymap[mypix+5]+=tod->data[det][j]*mysin*mysin;
+	    }
+	}
+	break;
+      default:
+	printf("Unsupported polarization in ground2tod.\n");
+	assert(1==0);
+      }
+    }
+#pragma omp critical
+    {
+      //int imax=map->nx*map->ny*get_npol_in_map(map);
+      for (int i=0;i<npix;i++)
+	map->map[i]+=mymap[i];
+    }
+    free(mymap);
   }
 }

@@ -1410,34 +1410,36 @@ ACTpolPointingFit *update_actpol_pointing(mbTOD *tod, actData *dx, actData *dy, 
   //fit->dy=vector(tod->ndet);
   //fit->theta=vector(tod->ndet);
   
-  memcpy(fit->dx,dx,tod->ndet*sizeof(actData));
-  memcpy(fit->dy,dy,tod->ndet*sizeof(actData));
-  if (angle)
-    memcpy(fit->theta,angle,tod->ndet*sizeof(actData));
-  else
-    memset(fit->theta,0,tod->ndet*sizeof(actData));
+  if (dx) {
 
-  //for (int i=0;i<tod->ndet;i++)
-  //  printf("Detector %d: %14.6f %14.6f %14.6f\n",i,fit->dx[i]*180/3.14159265,fit->dy[i]*180/3.14159265,fit->theta[i]*180/3.14159265);
+    memcpy(fit->dx,dx,tod->ndet*sizeof(actData));
+    memcpy(fit->dy,dy,tod->ndet*sizeof(actData));
+    if (angle)
+      memcpy(fit->theta,angle,tod->ndet*sizeof(actData));
+    else
+      memset(fit->theta,0,tod->ndet*sizeof(actData));
+
+    //for (int i=0;i<tod->ndet;i++)
+    //  printf("Detector %d: %14.6f %14.6f %14.6f\n",i,fit->dx[i]*180/3.14159265,fit->dy[i]*180/3.14159265,fit->theta[i]*180/3.14159265);
 
   
-  actData xtot=0,ytot=0;
-  for (int i=0;i<nhorns;i++){
-    xtot+=dx[i];
-    ytot+=dy[i];
-  }
-  actData xcent=xtot/((actData)nhorns);
-  actData ycent=ytot/((actData)nhorns);
-  ACTpolArray_init(array, freq, xcent,ycent);
-  for (int i = 0; i < nhorns; i++) {
-    if (angle != NULL)
-      ACTpolFeedhorn_init(array->horn+i, dx[i], dy[i], angle[i]);
-    else
-      ACTpolFeedhorn_init(array->horn+i, dx[i], dy[i],0);
+    actData xtot=0,ytot=0;
+    for (int i=0;i<nhorns;i++){
+      xtot+=dx[i];
+      ytot+=dy[i];
+    }
+    actData xcent=xtot/((actData)nhorns);
+    actData ycent=ytot/((actData)nhorns);
+    ACTpolArray_init(array, freq, xcent,ycent);
+    for (int i = 0; i < nhorns; i++) {
+      if (angle != NULL)
+	ACTpolFeedhorn_init(array->horn+i, dx[i], dy[i], angle[i]);
+      else
+	ACTpolFeedhorn_init(array->horn+i, dx[i], dy[i],0);
+    }
   }
   
   //fit->array=array;
-
   double azmin,azmax,altmin,altmax;
   azmin=tod->az[0];
   azmax=tod->az[0];
@@ -1460,7 +1462,7 @@ ACTpolPointingFit *update_actpol_pointing(mbTOD *tod, actData *dx, actData *dy, 
 
 
 
-
+ 
   int npiv=tod->ndata/dpiv+1;
   while ((npiv-1)*dpiv<tod->ndata-1)
     npiv++;
@@ -1517,6 +1519,7 @@ void precalc_actpol_pointing_exact_subsampled(mbTOD *tod, int downsamp, actData 
     ACTpolState_init(state);
 
     ACTpolScan scan;
+
     ACTpolScan_init(&scan, tod->actpol_pointing->alt0,tod->actpol_pointing->az0,tod->actpol_pointing->az_throw);
 
     ACTpolArrayCoords_update_refraction(coords, &scan, &weather);
