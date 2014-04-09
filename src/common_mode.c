@@ -1090,7 +1090,7 @@ void mbCalculateCommonFracErrs(const mbTOD *tod, mbNoiseCommonMode *fit)
       fit->frac_errs[i]=sqrt(act_dot(tod->ndata,tod->data[i],1,tod->data[i],1)/((actData)tod->ndata))/fit->median_scats[i];
 #else
 #ifdef ACTDATA_DOUBLE
-      fit->frac_errs[i]=sqrt(cblas_ddot(tod->ndata,tod->data[i],1,tod->data[i],1)/
+      fit->frac_errs[i]=sqrt(mbDot(tod->ndata,tod->data[i],1,tod->data[i],1)/
                              ((actData)tod->ndata))/fit->median_scats[i];
 #else
       fit->frac_errs[i]=sqrt(cblas_sdot(tod->ndata,tod->data[i],1,tod->data[i],1)/
@@ -1117,7 +1117,7 @@ void mbCalculateCommonFracErrs(const mbTOD *tod, mbNoiseCommonMode *fit)
       fit->frac_errs[i]=sqrt(act_dot(tod->ndata,vec,1,vec,1)/((actData)tod->ndata))/fit->median_scats[i];
 #else
 #ifdef ACTDATA_DOUBLE
-      fit->frac_errs[i]=sqrt(cblas_ddot(tod->ndata,vec,1,vec,1)/((actData)tod->ndata))/fit->median_scats[i];
+      fit->frac_errs[i]=sqrt(mbDot(tod->ndata,vec,1,vec,1)/((actData)tod->ndata))/fit->median_scats[i];
 #else
       fit->frac_errs[i]=sqrt(cblas_sdot(tod->ndata,vec,1,vec,1)/((actData)tod->ndata))/fit->median_scats[i];
 #endif      
@@ -1396,8 +1396,8 @@ void mbCalculateUnsmoothRatio(mbTOD *tod, mbNoiseCommonMode *fit)
     fit->unsmooth_ratio[i]=sqrt(act_dot(tod->ndata,dataCopy[i],1,dataCopy[i],1)/act_dot(tod->ndata,tod->data[i],1,tod->data[i],1));
 #else
 #ifdef ACTDATA_DOUBLE
-    fit->unsmooth_ratio[i]=sqrt(cblas_ddot(tod->ndata,dataCopy[i],1,dataCopy[i],1)/
-                                cblas_ddot(tod->ndata,tod->data[i],1,tod->data[i],1));
+    fit->unsmooth_ratio[i]=sqrt(mbDot(tod->ndata,dataCopy[i],1,dataCopy[i],1)/
+                                mbDot(tod->ndata,tod->data[i],1,tod->data[i],1));
 #else
     fit->unsmooth_ratio[i]=sqrt(cblas_sdot(tod->ndata,dataCopy[i],1,dataCopy[i],1)/
                                 cblas_sdot(tod->ndata,tod->data[i],1,tod->data[i],1));

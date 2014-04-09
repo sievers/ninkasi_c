@@ -376,7 +376,20 @@ actData mbDot(long n,actData *x,long incx,actData *y,long incy)
 #ifndef ACTDATA_DOUBLE
   return cblas_sdot(n,x,incx,y,incy);
 #else
-  return cblas_ddot(n,x,incx,y,incy);
+  double tot=0;
+  if (incx==incy==1) {
+    for (int i=0;i<n;i++)
+      tot+=x[i]*y[i];
+    return tot;
+  }
+  for (int i=0;i<n;i++) {
+    tot+=x[i*incx]*y[i*incy];
+    return tot;
+  }
+  assert(1==0);
+  return 0;
+
+  //return cblas_ddot(n,x,incx,y,incy);
 #endif
 }
 
@@ -390,7 +403,8 @@ void mbDaxpy(long n,actData a,actData *x,long incx,actData *y,long incy)
 #ifndef ACTDATA_DOUBLE
   cblas_saxpy(n,a,x,incx,y,incy);
 #else
-  cblas_daxpy(n,a,x,incx,y,incy);
+  //cblas_daxpy(n,a,x,incx,y,incy);
+  assert(1==0);  //nobody is using this
 #endif
 }
 
