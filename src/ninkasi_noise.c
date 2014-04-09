@@ -2303,10 +2303,22 @@ void fit_hwp_az_poly_to_data(mbTOD *tod, int nsin, int naz,int npoly, actData **
 void remove_hwp_poly_from_data(mbTOD *tod, int nsin, int npoly) 
 //remove a HWP signal from TOD data.
 {
+  //send in a negative value for the polynomial removal if you *don't* want the polynomial fit subtracted from the timestreams
+  int ignore_poly=0;
+  if (npoly<0) {
+    ignore_poly=1;
+    npoly=-1*npoly;
+  }
   int nparam=2*nsin+npoly;
   actData **vecs=matrix(tod->ndata,nparam);
   actData **fitp=matrix(tod->ndet,nparam);
   fit_hwp_poly_to_data(tod,nsin,npoly,fitp,vecs);
+  if (ignore_poly) {
+    for (int i=0;i<tod->ndet;i++) 
+      for (int j=2*nsin;j<nparam;j++)
+	fitp[i][j]=0;
+    
+  }
   printf("calling gemm.\n");
   act_gemm('t','n',tod->ndata,tod->ndet,nparam,-1.0,vecs[0],nparam,fitp[0],nparam,1.0,tod->data[0],tod->ndata);
   printf("finished gemm.\n");
@@ -2320,10 +2332,22 @@ void remove_hwp_poly_from_data(mbTOD *tod, int nsin, int npoly)
 void remove_hwp_az_poly_from_data(mbTOD *tod, int nsin, int naz, int npoly) 
 //remove a HWP signal from TOD data.
 {
+  int ignore_poly=0;
+  if (npoly<0) {
+    ignore_poly=1;
+    npoly=-1*npoly;
+  }
+
   int nparam=2*nsin+naz+npoly;
   actData **vecs=matrix(tod->ndata,nparam);
   actData **fitp=matrix(tod->ndet,nparam);
   fit_hwp_az_poly_to_data(tod,nsin,naz,npoly,fitp,vecs);
+
+  if (ignore_poly) {
+    for (int i=0;i<tod->ndet;i++) 
+      for (int j=2*nsin+naz;j<nparam;j++) 
+	fitp[i][j]=0;    
+  }
   double t1=omp_get_wtime();
   act_gemm('t','n',tod->ndata,tod->ndet,nparam,-1.0,vecs[0],nparam,fitp[0],nparam,1.0,tod->data[0],tod->ndata);
   double t2=omp_get_wtime();

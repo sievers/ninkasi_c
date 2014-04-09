@@ -4826,7 +4826,8 @@ void ground2tod(MAP *map, mbTOD *tod)
       int row=tod->rows[det];
       int col=tod->cols[det];
       mbUncut *uncut=tod->uncuts[row][col];
-      actData mydaz=tod->actpol_pointing->dx[det];
+      //actData mydaz=tod->actpol_pointing->dx[det];
+      actData mydaz=tod->actpol_pointing->dx[det]/cos(tod->alt[tod->ndata/2]);
       actData mydel=tod->actpol_pointing->dy[det];
       switch(poltag) {
       case POL_I:
@@ -4895,7 +4896,7 @@ void tod2ground(MAP *map, mbTOD *tod)
 #pragma omp parallel shared(map,tod) default(none)
   {
     int npix=map->nx*map->ny*get_npol_in_map(map);
-    printf("npix is %d\n",npix);
+    //printf("npix is %d\n",npix);
     actData *mymap=vector(npix);
     memset(mymap,0,npix*sizeof(actData));
     
@@ -4905,7 +4906,7 @@ void tod2ground(MAP *map, mbTOD *tod)
       int row=tod->rows[det];
       int col=tod->cols[det];
       mbUncut *uncut=tod->uncuts[row][col];
-      actData mydaz=tod->actpol_pointing->dx[det];
+      actData mydaz=tod->actpol_pointing->dx[det]/cos(tod->alt[tod->ndata/2]);
       actData mydel=tod->actpol_pointing->dy[det];
       switch(poltag) {
       case POL_I:
