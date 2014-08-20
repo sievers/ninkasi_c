@@ -4683,6 +4683,27 @@ void invert_pol_precon(MAP *map)
   {
     actData *mm=map->map;
     switch(poltag){
+    case POL_QU_PRECON: {
+      printf("inverting precon with %d %d pixels.\n",map->npix,get_npol_in_map(map));
+      actData **mymat=matrix(2,2);
+#pragma omp for
+      for (int i=0;i<map->npix;i++) {
+	int ii=i*3;
+	if ((fabs(mm[ii])>0)||(fabs(mm[ii+2])>0)) {
+	  mymat[0][0]=mm[ii];
+	  mymat[0][1]=mymat[1][0]=mm[ii+1];
+	  mymat[1][1]=mm[ii+2];
+	  dinvsafe(mymat[0],3,1e-6);
+	  mm[ii]=mymat[0][0];
+	  mm[ii+1]=mymat[0][1];
+	  mm[ii+2]=mymat[1][1];	  	  
+	}	
+      }
+    }
+      //free(mymat[0]);
+      //free(mymat);
+      
+      break;      
     case POL_IQU_PRECON:  {
       actData **mymat=matrix(3,3);
 #pragma omp for 
@@ -4752,6 +4773,20 @@ void apply_pol_precon(MAP *map, MAP *precon)
 	mm[im+1]=tmp2;
 	mm[im+2]=tmp3;
 	
+      }
+      
+    }
+      break;
+    case POL_QU:  {
+#pragma omp for schedule(static,512)
+      for (int i=0;i<map->npix;i++) {
+	int im=i*2;
+	int ip=i*3;
+	//see comment on indexing above.  Only doing a 2x2 here...
+	actData tmp1=mm[im]*pp[ip]+mm[im+1]*pp[ip+1];
+	actData tmp2=mm[im]*pp[ip+1]+mm[im+1]*pp[ip+2];
+	mm[im]=tmp1;
+	mm[im+1]=tmp2;
       }
       
     }
