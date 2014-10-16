@@ -3156,7 +3156,7 @@ void add_mapset2tod(const MAPvec *maps, mbTOD *tod, const PARAMS *params, actDat
 }
 
 /*--------------------------------------------------------------------------------*/
-actData inline calc_srcamp(actData ra, actData dec, actData srcra, actData srcdec, const actData *beam, actData dtheta, int nbeam, actData cosdec)
+static inline actData calc_srcamp(actData ra, actData dec, actData srcra, actData srcdec, const actData *beam, actData dtheta, int nbeam, actData cosdec)
 {
   actData maxdist=dtheta*(nbeam-1);
   actData ddec=srcdec-dec;
@@ -3198,7 +3198,7 @@ actData inline calc_srcamp(actData ra, actData dec, actData srcra, actData srcde
   return 0;
 }
 /*--------------------------------------------------------------------------------*/
-actData inline calc_srcamp_oversamp(int i, actData *ra, actData *dec,  actData srcra, actData srcdec, const actData *beam, actData dtheta, int nbeam, actData cosdec, int ndata, int oversamp)
+static inline actData calc_srcamp_oversamp(int i, actData *ra, actData *dec,  actData srcra, actData srcdec, const actData *beam, actData dtheta, int nbeam, actData cosdec, int ndata, int oversamp)
 {
   if ((oversamp<=1)||(i==0)||(i==ndata-1)) {
     return calc_srcamp(ra[i],dec[i],srcra,srcdec,beam,dtheta,nbeam,cosdec);

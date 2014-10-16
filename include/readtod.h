@@ -8,7 +8,7 @@ void *dirfile_read_channel_direct(char typechar, const char *filename, const cha
 
 
 void read_dirfile_tod_data (mbTOD *tod);
-actData **read_dirfile_tod_data_from_rowcol_list (mbTOD *tod, int *row, int *col, int ndet, actData **data);
+actData **read_dirfile_tod_data_from_rowcol_list (mbTOD *tod, int *row, int *col, int ndet, actData **data, int *nout);
 
 mbTOD *
 read_dirfile_tod_header( const char *filename );

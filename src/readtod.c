@@ -389,7 +389,7 @@ read_dirfile_tod_header_decimate( const char *filename , int decimate )
 
 
 
-actData **read_dirfile_tod_data_from_rowcol_list (mbTOD *tod, int *row, int *col, int ndet, actData **data)
+actData **read_dirfile_tod_data_from_rowcol_list (mbTOD *tod, int *row, int *col, int ndet, actData **data, int *nout)
 //if data is non-null, assume the space is allocated.
 {
   
@@ -435,8 +435,10 @@ actData **read_dirfile_tod_data_from_rowcol_list (mbTOD *tod, int *row, int *col
 	}
       }
     }
-    else
+    else {
       assert(n==tod->ndata);
+      *nout=n;
+    }
     memcpy(data[idet],chan+tod->start_offset,sizeof(actData)*tod->ndata);
     free(chan);
   }
@@ -453,7 +455,8 @@ void read_dirfile_tod_data (mbTOD *tod)
   assert(tod!=NULL);
   if (!tod->have_data)
     tod->data=NULL;
-  tod->data=read_dirfile_tod_data_from_rowcol_list(tod,tod->rows,tod->cols,tod->ndet,tod->data);
+  int nout=0;
+  tod->data=read_dirfile_tod_data_from_rowcol_list(tod,tod->rows,tod->cols,tod->ndet,tod->data,&nout);
   tod->have_data=1;
   
 

@@ -67,7 +67,7 @@ void legendre_project(actData *data, int ndata, actData *fitp, int ord);
 
 /*--------------------------------------------------------------------------------*/
 
-inline actData cos7_2pi(actData x_in) {
+static inline actData cos7_2pi(actData x_in) {
   //good to max err of ~2e-8 on (0,2*pi), exact on the ends
   actData x=x_in/M_PI-1;
   actData x2=x*x;
@@ -79,7 +79,7 @@ inline actData cos7_2pi(actData x_in) {
 
 /*--------------------------------------------------------------------------------*/
 
-inline actData sin7_2pi(actData x_in) {
+static inline actData sin7_2pi(actData x_in) {
   //good to max err of ~2e-7 on (0,2*pi), exact on the ends
   actData x=x_in/M_PI-1;
   actData x2=x*x;
@@ -87,14 +87,14 @@ inline actData sin7_2pi(actData x_in) {
 }
 
 /*--------------------------------------------------------------------------------*/
-inline actData cos7_pi(actData x) {
+static inline actData cos7_pi(actData x) {
   //good to max error of ~2e-8 on (-pi,pi), exact on ends and at zero
   actData x2=x*x;
   return 1+x2*(-0.499999893204828+x2*(0.0416664892174036+x2*(-0.00138878035981677+x2*(2.47698835591964e-05+x2*(-2.7079030835675e-07+x2*1.72450917950058e-09)))));
 }
 
 /*--------------------------------------------------------------------------------*/
-inline actData sin7_pi(actData x) {
+static inline actData sin7_pi(actData x) {
   //good to max error of ~2e-7 on (-pi,pi), exact on ends and at zero
   actData x2=x*x;
   return    x*(0.99999962990947+x2*(-0.166665526354068+x2*(0.00833240298869831+x2*(-0.000198086333417481+x2*(2.69971463695324e-06+x2*-2.03622449130948e-08)))));
@@ -102,14 +102,14 @@ inline actData sin7_pi(actData x) {
 
 
 /*--------------------------------------------------------------------------------*/
-inline actData cos5(actData x) {
+static inline actData cos5(actData x) {
   //good to max err of ~5e-8 on (pi/2,pi/2)
   actData x2=x*x;
   return 0.999999953247608 +x2*(-0.499999050628101 +x2*( 0.0416635789306837 +x2*( -0.00138536669329216 +x2* 2.31531741531081e-05)));
 }
 
 /*--------------------------------------------------------------------------------*/
-inline actData sin4(actData x)
+static inline actData sin4(actData x)
 {
   actData x2=x*x;
   actData x4=x2*x2;
@@ -121,7 +121,7 @@ inline actData sin4(actData x)
 }
 
 /*--------------------------------------------------------------------------------*/
-inline actData sin5( actData x)
+static inline actData sin5( actData x)
 {
   
   actData x2=x*x;
