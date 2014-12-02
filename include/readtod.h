@@ -2,8 +2,6 @@
 #pragma once
 
 #include "mbTOD.h"
-
-
 void *dirfile_read_channel_direct(char typechar, const char *filename, const char *channelname, int *nsamples_out);
 
 

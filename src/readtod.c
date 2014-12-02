@@ -19,6 +19,27 @@
 #include "dirfile.h"
 #include "getdata.h"
 
+
+
+typedef struct {
+  char **fnames;
+  struct FormatType **formats;
+  //void **formats;
+  int nfiles;
+} ManyFormatType;
+
+typedef struct {
+  int nrow;               ///< Number of detector rows.
+  int ncol;               ///< Number of detector columns.
+  int nparam;             ///< Number of parameters in the pointing solution model.
+  int fitType;            ///< Specify which model you're using for the pointing solution.
+  actData **offsetAlt;      ///< Array of angular distance offsets in Alt direction (radians).
+  actData **offsetAzCosAlt; ///< Array of angular distance offsets in the Az direction (radians).
+  actData *fit;             ///< Best fit parameters and errors for fitType fit.
+} mbPointingOffset2;
+
+
+
 #define ACT_ARRAY_MAX_ROWS 33
 #define ACT_ARRAY_MAX_COLS 32
 #define ACT_ARRAY_MAX_DETECTORS (ACT_ARRAY_MAX_ROWS*ACT_ARRAY_MAX_COLS)
@@ -387,9 +408,7 @@ read_dirfile_tod_header_decimate( const char *filename , int decimate )
 
 // ----------------------------------------------------------------------------
 
-
-
-actData **read_dirfile_tod_data_from_rowcol_list (mbTOD *tod, int *row, int *col, int ndet, actData **data, int *nout)
+actData **read_dirfile_tod_data_from_rowcol_list_old (mbTOD *tod, int *row, int *col, int ndet, actData **data, int *nout)
 //if data is non-null, assume the space is allocated.
 {
   
@@ -421,6 +440,151 @@ actData **read_dirfile_tod_data_from_rowcol_list (mbTOD *tod, int *row, int *col
 #else
     //printf("reading double channel\n");
     actData *chan = dirfile_read_double_channel( format, tesfield, &n );
+#endif
+    //printf("finished channel.\n");
+    for (int ii=0;ii<tod->decimate;ii++)
+      chan=decimate_vector(chan,&n);
+    if (n>tod->ndata) {
+#pragma omp critical 
+      {
+	static int firsttime=1;
+	if (firsttime) {
+	  firsttime=0;
+	  fprintf(stderr,"Warning - data is longer than the TOD.  You should be very nervous about this, unless you expected to see this message.\n");
+	}
+      }
+    }
+    else {
+      assert(n==tod->ndata);
+      *nout=n;
+    }
+    memcpy(data[idet],chan+tod->start_offset,sizeof(actData)*tod->ndata);
+    free(chan);
+  }
+  return data;
+}
+
+
+// ----------------------------------------------------------------------------
+ManyFormatType *GetManyFormat(char *fname, void *foo, int *status)
+{
+  printf("filename is x%sx\n",fname);
+  int nn=strlen(fname);
+  printf("file has %d characters.\n",nn);
+  int nfiles=1;
+  for (int i=0;i<nn;i++)
+    if (fname[i]==10)
+      nfiles++;
+  printf("have %d files.\n",nfiles);
+  char **fnames=(char **)malloc(sizeof(char *)*nfiles);
+  char *mystr=strdup(fname);
+  fnames[0]=mystr;
+  int ii=1;
+  for (int i=0;i<nn;i++) {
+    if (mystr[i]==10) {
+      mystr[i]=0;
+      fnames[ii]=mystr+i+1;
+      ii++;
+    }
+  }
+  for (int i=0;i<nfiles;i++)
+    printf("file %d is %s\n",i,fnames[i]);
+  printf("have %d bytes.\n",sizeof( ManyFormatType));
+  ManyFormatType *mft=(ManyFormatType *)malloc(sizeof( ManyFormatType));
+  mft->nfiles=nfiles;
+  mft->fnames=fnames;
+  mft->formats=(struct FormatType **)malloc(sizeof(struct FormatType *)*mft->nfiles);
+  for (int i=0;i<mft->nfiles;i++) {
+    mft->formats[i]=GetFormat(mft->fnames[i],NULL,status);
+    if (*status)
+      printf("file %s had a problem reading format.\n",mft->fnames[i]);
+  }
+  printf("read my formats.\n");
+  return mft;
+}
+
+// ----------------------------------------------------------------------------
+actData *dirfile_read_actdata_channel(struct FormatType *fmt, char *channame, int *n)
+{
+#ifndef ACTDATA_DOUBLE
+  //printf("reading float channel\n");
+  return dirfile_read_float_channel( fmt, channame, n );
+#else
+  //printf("reading double channel\n");
+  return dirfile_read_double_channel( fmt, channame, n );
+#endif
+
+}
+// ----------------------------------------------------------------------------
+actData *many_dirfile_read_actData_channel(ManyFormatType *fmt, char *channame, int *n)
+{
+  if (fmt->nfiles==1)
+    return dirfile_read_actdata_channel(fmt->formats[0],channame,n);
+
+  int *ndata=(int *)malloc(sizeof(int)*fmt->nfiles);
+  actData **vecs=(actData **)malloc(sizeof(actData *)*fmt->nfiles);
+  for (int i=0;i<fmt->nfiles;i++) {
+    vecs[i]=dirfile_read_actdata_channel(fmt->formats[i],channame,&ndata[i]);
+    printf("ndata on %d is %d\n",i,ndata[i]);
+  }
+  int ntot=0;
+  for (int i=0;i<fmt->nfiles;i++)
+    ntot+=ndata[i];
+  actData *vec=(actData *)malloc(ntot*sizeof(actData));
+  int istart=0;
+  for (int i=0;i<fmt->nfiles;i++) {
+    memcpy(vec+istart,vecs[i],ndata[i]*sizeof(actData));
+    istart+=ndata[i];
+  }
+  
+  free(ndata);
+  for (int i=0;i<fmt->nfiles;i++)
+    free(vecs[i]);
+  free(vecs);
+  *n=ntot;
+  return vec;
+}
+
+// ----------------------------------------------------------------------------
+
+actData **read_dirfile_tod_data_from_rowcol_list (mbTOD *tod, int *row, int *col, int ndet, actData **data, int *nout)
+//if data is non-null, assume the space is allocated.
+{
+  
+  int status;
+  assert(tod!=NULL);
+  //printf("reading format from %s.\n",tod->dirfile);
+  ManyFormatType *format=GetManyFormat(tod->dirfile,NULL,&status);
+  
+
+  //struct FormatType *format = GetFormat( tod->dirfile, NULL, &status );
+  //printf("got it.\n");
+  assert( format != NULL );
+  
+
+  
+  if (data==NULL) {
+    actData *vec=(actData *)malloc(ndet*tod->ndata*sizeof(actData));
+    assert(vec!=NULL);
+    for (int i=0;i<ndet;i++)
+      data[i]=vec+i*tod->ndata;
+  }
+  
+  for (int idet=0;idet<ndet;idet++) {
+    assert(row[idet]<33);
+    assert(col[idet]<32);
+    char tesfield[]="tesdatar00c00";
+    sprintf(tesfield,"tesdatar%02dc%02d",row[idet],col[idet]);
+    int n;
+
+    actData *chan=many_dirfile_read_actData_channel(format,tesfield,&n);
+
+#ifndef ACTDATA_DOUBLE
+    //printf("reading float channel\n");
+    //actData *chan = dirfile_read_float_channel( format, tesfield, &n );
+#else
+    //printf("reading double channel\n");
+    //actData *chan = dirfile_read_double_channel( format, tesfield, &n );
 #endif
     //printf("finished channel.\n");
     for (int ii=0;ii<tod->decimate;ii++)

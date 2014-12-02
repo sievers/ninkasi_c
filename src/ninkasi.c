@@ -3019,6 +3019,7 @@ void map2det(const MAP *map, const mbTOD *tod, actData *vec, int *ind, int det, 
   int col=tod->cols[det];
   mbUncut *uncut=tod->uncuts[row][col];
   for (int region=0;region<uncut->nregions;region++) {
+    //printf("working on region %d of %d with limits %d %d\n",region,region<uncut->nregions,uncut->indexFirst[region],uncut->indexLast[region]);
     for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++)
       vec[j]+=map->map[ind[j]];
   }
