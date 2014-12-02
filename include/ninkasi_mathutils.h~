@@ -4,7 +4,10 @@
 
 
 
+#ifndef MAKEFILE_HAND
 #include "config.h"
+#endif
+
 #include "ninkasi_defs.h"
 
 
@@ -33,6 +36,10 @@ void eval_2d_poly_inplace(actData *x, actData *y, int n, PolyParams2d *fit, actD
 void eval_2d_poly_pair_inplace(actData *x, actData *y, int n,const  PolyParams2d *fit, actData *d, const PolyParams2d *fit2, actData *d2);
 actData *eval_2d_poly(actData *x, actData *y, int n, PolyParams2d *fit);
 
+
+void linfit_many_vecs(actData **d, actData **vecs, int n, int ncol, int np, actData **fitp);
+
+
 void add_outer_product(actData *col, int ncol, actData *row, int nrow, actData **mat);
 
 actData vecmin(actData *vec, int n);
@@ -49,6 +56,49 @@ actData mygasdev(unsigned *seed);
 actData myrand(unsigned *seed);
 
 void act_gemm(char transa, char transb, int m, int n, int k, actData alpha, actData *a, int lda, actData *b, int ldb, actData beta, actData *c, int ldc);
+//void act_syrk(char uplo, char trans, int n, int k, actData alpha, actData *a, int lda, actData beta, actData *c, int ldc);
+actData act_dot(int n, actData *x, int incx, actData *y, int incy);
+
+actData *legendre_fit(actData *data, int ndata, int ord);
+actData **legendre_mat(int ndata, int ord);
+void legendre_eval(actData *data, int ndata, actData *fitp, int ord);
+void legendre_project(actData *data, int ndata, actData *fitp, int ord);
+
+
+/*--------------------------------------------------------------------------------*/
+
+inline actData cos7_2pi(actData x_in) {
+  //good to max err of ~2e-8 on (0,2*pi), exact on the ends
+  actData x=x_in/M_PI-1;
+  actData x2=x*x;
+  return -1+x2*(4.93480114651863+x2*(-4.0586948412458+x2*(1.33515843017908+x2*(-0.235029808418504+x2*0.0253589836549547+x2*-0.00159391068835892))));
+
+}
+
+
+
+/*--------------------------------------------------------------------------------*/
+
+inline actData sin7_2pi(actData x_in) {
+  //good to max err of ~2e-7 on (0,2*pi), exact on the ends
+  actData x=x_in/M_PI-1;
+  actData x2=x*x;
+  return x*(-3.1415914909161+x2*(5.16767742320197+x2*(-2.54987933610477+x2*(0.598278811333994+x2*(-0.080476061782444+x2*0.00599065426734528)))));
+}
+
+/*--------------------------------------------------------------------------------*/
+inline actData cos7_pi(actData x) {
+  //good to max error of ~2e-8 on (-pi,pi), exact on ends and at zero
+  actData x2=x*x;
+  return 1+x2*(-0.499999893204828+x2*(0.0416664892174036+x2*(-0.00138878035981677+x2*(2.47698835591964e-05+x2*(-2.7079030835675e-07+x2*1.72450917950058e-09)))));
+}
+
+/*--------------------------------------------------------------------------------*/
+inline actData sin7_pi(actData x) {
+  //good to max error of ~2e-7 on (-pi,pi), exact on ends and at zero
+  actData x2=x*x;
+  return    x*(0.99999962990947+x2*(-0.166665526354068+x2*(0.00833240298869831+x2*(-0.000198086333417481+x2*(2.69971463695324e-06+x2*-2.03622449130948e-08)))));
+}
 
 
 /*--------------------------------------------------------------------------------*/

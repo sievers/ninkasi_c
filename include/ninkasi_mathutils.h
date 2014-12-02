@@ -65,6 +65,7 @@ void legendre_eval(actData *data, int ndata, actData *fitp, int ord);
 void legendre_project(actData *data, int ndata, actData *fitp, int ord);
 
 
+#if 0 //glamdring pukes on having hese guys in the header.
 /*--------------------------------------------------------------------------------*/
 
 inline actData cos7_2pi(actData x_in) {
@@ -133,8 +134,17 @@ inline actData sin5( actData x)
   
 }
 
+
 /*--------------------------------------------------------------------------------*/
 
-
+#else
+actData cos7_2pi(actData x_in);
+actData sin7_2pi(actData x_in);
+actData cos7_pi(actData x);
+actData sin7_pi(actData x);
+actData cos5(actData x);
+actData sin4(actData x);
+actData sin5( actData x);
+#endif
 
 #endif
