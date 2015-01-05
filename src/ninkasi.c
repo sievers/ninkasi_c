@@ -2321,8 +2321,14 @@ void polmap2tod(MAP *map, mbTOD *tod)
 
 	    actData mysin,mycos;
 	    actData aa=az[j];
-	    mysin=az_sin[3]+aa*(az_sin[2]+aa*(az_sin[1]+aa*(az_sin[0])))+ctime_sin*j;
-	    mycos=az_cos[3]+aa*(az_cos[2]+aa*(az_cos[1]+aa*(az_cos[0])))+ctime_cos*j;
+	    if (tod->twogamma_saved) {
+	      mysin=sin7_pi(tod->twogamma_saved[det][j]);
+	      mycos=cos7_pi(tod->twogamma_saved[det][j]);	      
+	    }
+	    else {
+	      mysin=az_sin[3]+aa*(az_sin[2]+aa*(az_sin[1]+aa*(az_sin[0])))+ctime_sin*j;
+	      mycos=az_cos[3]+aa*(az_cos[2]+aa*(az_cos[1]+aa*(az_cos[0])))+ctime_cos*j;
+	    }
 #ifdef DO_HWP_POLMAP
 	    actData tmp=mysin*hwp_cos[j]+mycos*hwp_sin[j];
 	    mycos=mycos*hwp_cos[j]-mysin*hwp_sin[j];
@@ -2559,8 +2565,14 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
 	    
 	    //get_twogamma_sincos(&mysin,&mycos,pfit->gamma_az_sin_coeffs[det],pfit->gamma_az_cos_coeffs[det],pfit->n_gamma_az_coeffs,tod->az[j],pfit->gamma_ctime_sin_coeffs[det],pfit->gamma_ctime_cos_coeffs[det],j*ninv);
 	    actData aa=az[j];
-	    mysin=az_sin[3]+aa*(az_sin[2]+aa*(az_sin[1]+aa*(az_sin[0])))+ctime_sin*j;
-	    mycos=az_cos[3]+aa*(az_cos[2]+aa*(az_cos[1]+aa*(az_cos[0])))+ctime_cos*j;
+	    if (tod->twogamma_saved) {
+	      mysin=sin7_pi(tod->twogamma_saved[det][j]);
+	      mycos=cos7_pi(tod->twogamma_saved[det][j]);
+	    }
+	    else {
+	      mysin=az_sin[3]+aa*(az_sin[2]+aa*(az_sin[1]+aa*(az_sin[0])))+ctime_sin*j;
+	      mycos=az_cos[3]+aa*(az_cos[2]+aa*(az_cos[1]+aa*(az_cos[0])))+ctime_cos*j;
+	    }
 
 #ifdef DO_HWP_POLMAP
 	    actData tmp=mysin*hwp_cos[j]+mycos*hwp_sin[j];
@@ -2617,8 +2629,14 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
 
 	    //get_twogamma_sincos(&mysin,&mycos,pfit->gamma_az_sin_coeffs[det],pfit->gamma_az_cos_coeffs[det],pfit->n_gamma_az_coeffs,tod->az[j],pfit->gamma_ctime_sin_coeffs[det],pfit->gamma_ctime_cos_coeffs[det],j*ninv);
 	    actData aa=az[j];
-	    mysin=az_sin[3]+aa*(az_sin[2]+aa*(az_sin[1]+aa*(az_sin[0])))+ctime_sin*j;
-	    mycos=az_cos[3]+aa*(az_cos[2]+aa*(az_cos[1]+aa*(az_cos[0])))+ctime_cos*j;
+	    if (tod->twogamma_saved) {
+	      mysin=sin7_pi(tod->twogamma_saved[det][j]);
+	      mycos=cos7_pi(tod->twogamma_saved[det][j]);
+	    }
+	    else {
+	      mysin=az_sin[3]+aa*(az_sin[2]+aa*(az_sin[1]+aa*(az_sin[0])))+ctime_sin*j;
+	      mycos=az_cos[3]+aa*(az_cos[2]+aa*(az_cos[1]+aa*(az_cos[0])))+ctime_cos*j;
+	    }
 #ifdef DO_HWP_POLMAP
 	    actData tmp=mysin*hwp_cos[j]+mycos*hwp_sin[j];
 	    mycos=mycos*hwp_cos[j]-mysin*hwp_sin[j];
@@ -2657,6 +2675,51 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
 	}
       }
       break;
+    case POL_QU_PRECON:
+#pragma omp for
+      for (int det=0;det<tod->ndet;det++) {
+	actData ctime_sin=pfit->gamma_ctime_sin_coeffs[det]*ninv;
+	actData ctime_cos=pfit->gamma_ctime_cos_coeffs[det]*ninv;
+	const actData *az_sin=pfit->gamma_az_sin_coeffs[det];
+	const actData *az_cos=pfit->gamma_az_cos_coeffs[det];
+
+	int row=tod->rows[det];
+	int col=tod->cols[det];
+	mbUncut *uncut=tod->uncuts[row][col];
+	for (int region=0;region<uncut->nregions;region++) {
+	  for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++){
+
+	    //get_twogamma_sincos(&mysin,&mycos,pfit->gamma_az_sin_coeffs[det],pfit->gamma_az_cos_coeffs[det],pfit->n_gamma_az_coeffs,tod->az[j],pfit->gamma_ctime_sin_coeffs[det],pfit->gamma_ctime_cos_coeffs[det],j*ninv);
+	    actData aa=az[j];
+	    if (tod->twogamma_saved) {
+	      mysin=sin7_pi(tod->twogamma_saved[det][j]);
+	      mycos=cos7_pi(tod->twogamma_saved[det][j]);
+	    }
+	    else {
+	      mysin=az_sin[3]+aa*(az_sin[2]+aa*(az_sin[1]+aa*(az_sin[0])))+ctime_sin*j;
+	      mycos=az_cos[3]+aa*(az_cos[2]+aa*(az_cos[1]+aa*(az_cos[0])))+ctime_cos*j;
+	    }
+#ifdef DO_HWP_POLMAP
+	    actData tmp=mysin*hwp_cos[j]+mycos*hwp_sin[j];
+	    mycos=mycos*hwp_cos[j]-mysin*hwp_sin[j];
+	    mysin=tmp;
+#endif
+
+	    
+	    //actData mycos=cos7_pi(tod->twogamma_saved[det][j]);
+	    //actData mysin=sin7_pi(tod->twogamma_saved[det][j]);
+
+	    int jj=tod->pixelization_saved[det][j]*npol;
+	    
+	    mymap[jj]+=tod->data[det][j]*mycos*mycos;
+	    mymap[jj+1]+=tod->data[det][j]*mycos*mysin;
+	    mymap[jj+2]+=tod->data[det][j]*mysin*mysin;
+	    
+	  }
+	}
+      }
+      break;
+
     default:  //should never get here, as error should have already triggered above.
       printf("Error - Don't know how to deal with map polarization in tod2polmap_copy.\n");
       break;
@@ -4694,15 +4757,18 @@ void invert_pol_precon(MAP *map)
 	  mymat[0][0]=mm[ii];
 	  mymat[0][1]=mymat[1][0]=mm[ii+1];
 	  mymat[1][1]=mm[ii+2];
-	  dinvsafe(mymat[0],3,1e-6);
+	  //dinvsafe(mymat[0],2,1e-6);
+	  invert_posdef_mat(mymat,2);
 	  mm[ii]=mymat[0][0];
 	  mm[ii+1]=mymat[0][1];
 	  mm[ii+2]=mymat[1][1];	  	  
 	}	
       }
+      printf("finished.\n");
+      free(mymat[0]);
+      free(mymat);
+
     }
-      //free(mymat[0]);
-      //free(mymat);
       
       break;      
     case POL_IQU_PRECON:  {

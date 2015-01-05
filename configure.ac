@@ -6,6 +6,7 @@ AC_INIT([ninkasi], [0.0.1], [sievers@cita.utoronto.ca,nolta@cita.utoronto.ca])
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([src/ninkasi.c])
 AC_CONFIG_HEADER([config.h])
+AC_CONFIG_MACRO_DIR([m4])
 
 AC_ARG_ENABLE([actdata-double],
               AC_HELP_STRING([--enable-actdata-double],
