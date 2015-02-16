@@ -26,7 +26,8 @@
 #  endif
 #endif
 
-#include "dirfile.h"
+#include "readtod.h"
+//#include "dirfile.h"
 #include "astro.h"
 #include "mbCommon.h"
 #include "mbCuts.h"

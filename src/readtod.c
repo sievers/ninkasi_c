@@ -16,9 +16,27 @@
 #include <unistd.h>
 
 #include "readtod.h"
-#include "dirfile.h"
-#include "getdata.h"
 
+
+#ifdef ACTPOL_DIRFILE
+//#include "actpol/dirfile.h"
+//#include "actpol/getdata.h"
+
+void *ACTpolDirfile_read_channel( char typechar, const ACTpolDirfile *dirfile,
+			    const char *channelname, int *nsamples_out );
+
+
+typedef struct {
+  char **fnames;
+  ACTpolDirfile **formats;
+  //void **formats;
+  int nfiles;
+} ManyFormatType;
+
+
+#else
+//#include "dirfile.h"
+//#include "getdata.h"
 
 
 typedef struct {
@@ -27,6 +45,10 @@ typedef struct {
   //void **formats;
   int nfiles;
 } ManyFormatType;
+
+
+#endif
+
 
 typedef struct {
   int nrow;               ///< Number of detector rows.
@@ -46,13 +68,59 @@ typedef struct {
 
 #define MAX(A,B) ((A > B) ? (A) : (B))
 
+
+#ifdef ACTPOL_DIRFILE
+
+void *dirfile_read_channel(char typechar, const ACTpolDirfile *dirfile,const char *channelname, int *nsamples_out )
+{
+  return ACTpolDirfile_read_channel(typechar,dirfile,channelname,nsamples_out);
+}
+
+
+float *dirfile_read_float_channel(const ACTpolDirfile *dirfile, const char *channelname, int *nsamples)
+{
+  return ACTpolDirfile_read_float_channel(dirfile,channelname,nsamples);
+}
+
+double *dirfile_read_double_channel(const ACTpolDirfile *dirfile, const char *channelname, int *nsamples)
+{
+  return ACTpolDirfile_read_double_channel(dirfile,channelname,nsamples);
+}
+
+uint32_t *dirfile_read_uint32_channel(const ACTpolDirfile *dirfile, const char *channelname, int *nsamples)
+{
+  return ACTpolDirfile_read_uint32_channel(dirfile,channelname,nsamples);
+}
+
+
+
+uint32_t dirfile_read_uint32_sample(const ACTpolDirfile *dirfile, const char *channelname, int index)
+{
+  return ACTpolDirfile_read_uint32_sample(dirfile,channelname,index);
+}
+
+bool dirfile_has_channel(const ACTpolDirfile *dirfile, const char *channel)
+{
+  return ACTpolDirfile_has_channel(dirfile,channel);
+}
+
+
+
+#endif
+
+
 /*--------------------------------------------------------------------------------*/
 
 void *dirfile_read_channel_direct(char typechar, const char *filename, const char *channelname, int *nsamples_out)
 {
   int status;
   *nsamples_out=0;
+#ifdef ACTPOL_DIRFILE
+  ACTpolDirfile *format = ACTpolDirfile_open(filename);
+#else
   struct FormatType *format = GetFormat( filename, NULL, &status );
+#endif
+
   if (format==NULL) {
     fprintf(stderr,"Warning - problem reading format from file .%s.\n",filename);
     return NULL;
@@ -62,9 +130,14 @@ void *dirfile_read_channel_direct(char typechar, const char *filename, const cha
     fprintf(stderr,"Error reading channel %s from %s\n",channelname,filename);
 
   }
-
+#ifdef ACTPOL_DIRFILE
+  ACTpolDirfile_close(format);
+#else
+  
   GetDataClose(format);
   free(format);
+#endif
+  
   return data;
 
 }
@@ -93,7 +166,13 @@ read_dirfile_tod_header( const char *filename )
 
     int status, n;
     //printf("reading format from %s\n",filename);
+
+#ifdef ACTPOL_DIRFILE
+    ACTpolDirfile *format = ACTpolDirfile_open(filename);
+#else
     struct FormatType *format = GetFormat( filename, NULL, &status );
+#endif
+
     assert( format != NULL );
     mbTOD *tod = (mbTOD *) calloc( 1,sizeof(mbTOD) );
     tod->dirfile=strdup(filename);
@@ -179,9 +258,15 @@ read_dirfile_tod_header( const char *filename )
     tod->data=NULL;  //should already be set thusly.
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+
+#ifdef ACTPOL_DIRFILE
+  ACTpolDirfile_close(format);
+#else
+
     GetDataClose(format);
     free(format);
-
+#endif
+    
     return tod;
 }
 
@@ -200,7 +285,11 @@ read_dirfile_tod_header_abs( const char *filename )
 
     int status, n,nn;
     //printf("reading format from %s\n",filename);
+#ifdef ACTPOL_DIRFILE
+    ACTpolDirfile *format = ACTpolDirfile_open(filename);
+#else
     struct FormatType *format = GetFormat( filename, NULL, &status );
+#endif   
     assert( format != NULL );
     mbTOD *tod = (mbTOD *) calloc( 1,sizeof(mbTOD) );
     tod->dirfile=strdup(filename);
@@ -318,9 +407,14 @@ read_dirfile_tod_header_abs( const char *filename )
     // data
     tod->data=NULL;  //should already be set thusly.
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    
-    GetDataClose(format);
-    free(format);
+
+#ifdef ACTPOL_DIRFILE
+  ACTpolDirfile_close(format);
+#else
+  
+  GetDataClose(format);
+  free(format);
+#endif
     
     return tod;
 }
@@ -415,11 +509,16 @@ actData **read_dirfile_tod_data_from_rowcol_list_old (mbTOD *tod, int *row, int 
   int status;
   assert(tod!=NULL);
   //printf("reading format from %s.\n",tod->dirfile);
+
+#ifdef ACTPOL_DIRFILE
+  ACTpolDirfile *format = ACTpolDirfile_open(tod->dirfile);
+#else
   struct FormatType *format = GetFormat( tod->dirfile, NULL, &status );
+#endif
   //printf("got it.\n");
   assert( format != NULL );
   
-
+  
   
   if (data==NULL) {
     actData *vec=(actData *)malloc(ndet*tod->ndata*sizeof(actData));
@@ -493,18 +592,42 @@ ManyFormatType *GetManyFormat(char *fname, void *foo, int *status)
   ManyFormatType *mft=(ManyFormatType *)malloc(sizeof( ManyFormatType));
   mft->nfiles=nfiles;
   mft->fnames=fnames;
+#ifdef ACTPOL_DIRFILE
+  mft->formats=(ACTpolDirfile **)malloc(sizeof(ACTpolDirfile *)*mft->nfiles);
+#else
   mft->formats=(struct FormatType **)malloc(sizeof(struct FormatType *)*mft->nfiles);
+#endif
   for (int i=0;i<mft->nfiles;i++) {
+#ifdef ACTPOL_DIRFILE
+    mft->formats[i]=ACTpolDirfile_open(mft->fnames[i]);
+#else
     mft->formats[i]=GetFormat(mft->fnames[i],NULL,status);
+#endif
     if (*status)
       printf("file %s had a problem reading format.\n",mft->fnames[i]);
   }
   printf("read my formats.\n");
   return mft;
 }
-
+/*--------------------------------------------------------------------------------*/
+void FreeManyFormat(ManyFormatType *fmt)
+{
+  for (int i=0;i<fmt->nfiles;i++) {
+#ifdef ACTPOL_DIRFILE
+    ACTpolDirfile_close(fmt->formats[i]);
+#else
+    GetDataClose(fmt->formats[i]);
+    free(fmt->formats[i]);    
+#endif
+  }
+  free(fmt);
+}
 // ----------------------------------------------------------------------------
+#ifdef ACTPOL_DIRFILE
+actData *dirfile_read_actdata_channel(const ACTpolDirfile *fmt, char *channame, int *n)
+#else
 actData *dirfile_read_actdata_channel(struct FormatType *fmt, char *channame, int *n)
+#endif
 {
 #ifndef ACTDATA_DOUBLE
   //printf("reading float channel\n");
@@ -606,6 +729,9 @@ actData **read_dirfile_tod_data_from_rowcol_list (mbTOD *tod, int *row, int *col
     memcpy(data[idet],chan+tod->start_offset,sizeof(actData)*tod->ndata);
     free(chan);
   }
+
+  FreeManyFormat(format);
+
   return data;
 }
 
