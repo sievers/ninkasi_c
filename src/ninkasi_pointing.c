@@ -1493,8 +1493,8 @@ void precalc_actpol_pointing_exact_subsampled(mbTOD *tod, int downsamp, actData 
   assert(tod);
   
   
-  //#pragma omp parallel shared(tod,do_radec,do_2gamma) default(none)
-#pragma omp parallel shared(tod,ra,dec,twogamma,downsamp) default(none)
+
+  //#pragma omp parallel shared(tod,ra,dec,twogamma,downsamp) default(none)
   {
     
     ACTpolArray *array = ACTpolArray_alloc(tod->ndet);
@@ -1523,7 +1523,7 @@ void precalc_actpol_pointing_exact_subsampled(mbTOD *tod, int downsamp, actData 
     ACTpolScan_init(&scan, tod->actpol_pointing->alt0,tod->actpol_pointing->az0,tod->actpol_pointing->az_throw);
 
     ACTpolArrayCoords_update_refraction(coords, &scan, &weather);
-    
+
 #pragma omp for
     for (int i=0;i<tod->ndata;i+=downsamp) {
       int ii=i/downsamp;
