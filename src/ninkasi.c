@@ -4681,11 +4681,12 @@ void get_data_corrs(mbTOD *tod)
 void rotate_data_detpairs(mbTOD *tod)
 //rotate into the sum and difference of detector pairs.  With appropriate normalization, operation is symmetric
 {
-  return;
+
   assert(tod);
-  assert(tod->have_data);
   if (!tod->paired_detectors)
     return;
+  
+  assert(tod->have_data);
   //printf("checking out %d detectors.\n",tod->ndata);
 #pragma omp parallel for shared(tod) default(none) schedule(dynamic,4)
   for (int det=0;det<tod->ndet;det++) {

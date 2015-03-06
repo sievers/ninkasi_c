@@ -1996,9 +1996,10 @@ void apply_noise(mbTOD *tod)
       free_demod_data(tod->demod);
       return;
     }
+    rotate_data_detpairs(tod);
     apply_banded_projvec_noise_model(tod);
     //printf("applied.\n");
-    //rotate_data_detpairs(tod);
+    rotate_data_detpairs(tod);
     //printf("done and headed home.\n");
     return;
     }
