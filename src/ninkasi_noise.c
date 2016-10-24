@@ -1990,15 +1990,18 @@ void apply_noise(mbTOD *tod)
     //rotate_data_detpairs(tod);
     //printf("rotated.\n");
     if (tod->demod) {
+      printf("doing demod noise.\n");
       demodulate_data(tod,tod->demod);
       apply_banded_projvec_noise_model_demod(tod);
       remodulate_data(tod,tod->demod);
       free_demod_data(tod->demod);
       return;
     }
+    //printf("doing normal model.\n");
+    rotate_data_detpairs(tod);
     apply_banded_projvec_noise_model(tod);
     //printf("applied.\n");
-    //rotate_data_detpairs(tod);
+    rotate_data_detpairs(tod);
     //printf("done and headed home.\n");
     return;
     }

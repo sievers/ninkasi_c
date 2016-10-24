@@ -2679,7 +2679,32 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
       break;
     case POL_QU_PRECON:
 #pragma omp for
+#if 1
+      //this is the c-bass branch
       for (int det=0;det<tod->ndet;det++) {
+	int row=tod->rows[det];
+	int col=tod->cols[det];
+	mbUncut *uncut=tod->uncuts[row][col];
+	for (int region=0;region<uncut->nregions;region++) {
+	  for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++){
+#if 1
+	    actData mycos=cos7_pi(tod->twogamma_saved[det][j]);
+	    actData mysin=sin7_pi(tod->twogamma_saved[det][j]);
+	    int jj=tod->pixelization_saved[det][j]*npol;
+	    mymap[jj]+=tod->data[det][j]*mycos*mycos;
+	    mymap[jj+1]+=tod->data[det][j]*mycos*mysin;
+	    mymap[jj+2]+=tod->data[det][j]*mysin*mysin;
+	    
+#else
+	    mymap[tod->pixelization_saved[det][j]]+=tod->data[det][j]*cos(tod->twogamma_saved[det][j]);
+	    mymap[tod->pixelization_saved[det][j]+npix]+=tod->data[det][j]*sin(tod->twogamma_saved[det][j]);
+#endif
+	  }
+	}
+      }
+#else
+      for (int det=0;det<tod->ndet;det++) {
+	printf("working on detector %d\n",det);
 	actData ctime_sin=pfit->gamma_ctime_sin_coeffs[det]*ninv;
 	actData ctime_cos=pfit->gamma_ctime_cos_coeffs[det]*ninv;
 	const actData *az_sin=pfit->gamma_az_sin_coeffs[det];
@@ -2720,6 +2745,7 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
 	  }
 	}
       }
+#endif
       break;
 
     default:  //should never get here, as error should have already triggered above.
@@ -4681,11 +4707,12 @@ void get_data_corrs(mbTOD *tod)
 void rotate_data_detpairs(mbTOD *tod)
 //rotate into the sum and difference of detector pairs.  With appropriate normalization, operation is symmetric
 {
-  return;
+
   assert(tod);
-  assert(tod->have_data);
   if (!tod->paired_detectors)
     return;
+  
+  assert(tod->have_data);
   //printf("checking out %d detectors.\n",tod->ndata);
 #pragma omp parallel for shared(tod) default(none) schedule(dynamic,4)
   for (int det=0;det<tod->ndet;det++) {

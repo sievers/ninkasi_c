@@ -648,7 +648,7 @@ actData *many_dirfile_read_actData_channel(ManyFormatType *fmt, char *channame, 
   actData **vecs=(actData **)malloc(sizeof(actData *)*fmt->nfiles);
   for (int i=0;i<fmt->nfiles;i++) {
     vecs[i]=dirfile_read_actdata_channel(fmt->formats[i],channame,&ndata[i]);
-    printf("ndata on %d is %d\n",i,ndata[i]);
+    //printf("ndata on %d is %d\n",i,ndata[i]);
   }
   int ntot=0;
   for (int i=0;i<fmt->nfiles;i++)
