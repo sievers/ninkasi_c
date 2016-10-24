@@ -1643,7 +1643,7 @@ void precalc_actpol_pointing_exact(mbTOD *tod, int op_flag)
     ACTpolState_init(state);
 
     ACTpolScan scan;
-#if 1
+#if 0
     tod->actpol_pointing->alt0=0.8446;
     tod->actpol_pointing->az0=5.204;
     tod->actpol_pointing->az_throw=0.1307;
@@ -1701,6 +1701,9 @@ void precalc_actpol_pointing_exact(mbTOD *tod, int op_flag)
       actData ratot=0;
       actData dectot=0;
       for (int j=0;j<tod->ndata;j++) {
+	ACTpolState_free(state);
+	ACTpolArrayCoords_free(coords);
+	ACTpolArray_free(array);
 	ratot+=tod->ra_saved[i][j];
 	dectot+=tod->dec_saved[i][j];
       }
