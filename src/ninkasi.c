@@ -2323,6 +2323,7 @@ void polmap2tod(MAP *map, mbTOD *tod)
 
 	    actData mysin,mycos;
 	    actData aa=az[j];
+	    aa=(aa-pfit->az_cent)/pfit->az_std;
 	    if (tod->twogamma_saved) {
 	      mysin=sin7_pi(tod->twogamma_saved[det][j]);
 	      mycos=cos7_pi(tod->twogamma_saved[det][j]);	      
@@ -2567,6 +2568,7 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
 	    
 	    //get_twogamma_sincos(&mysin,&mycos,pfit->gamma_az_sin_coeffs[det],pfit->gamma_az_cos_coeffs[det],pfit->n_gamma_az_coeffs,tod->az[j],pfit->gamma_ctime_sin_coeffs[det],pfit->gamma_ctime_cos_coeffs[det],j*ninv);
 	    actData aa=az[j];
+	    aa=(aa-pfit->az_cent)/pfit->az_std;
 	    if (tod->twogamma_saved) {
 	      mysin=sin7_pi(tod->twogamma_saved[det][j]);
 	      mycos=cos7_pi(tod->twogamma_saved[det][j]);
@@ -2631,6 +2633,7 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
 
 	    //get_twogamma_sincos(&mysin,&mycos,pfit->gamma_az_sin_coeffs[det],pfit->gamma_az_cos_coeffs[det],pfit->n_gamma_az_coeffs,tod->az[j],pfit->gamma_ctime_sin_coeffs[det],pfit->gamma_ctime_cos_coeffs[det],j*ninv);
 	    actData aa=az[j];
+	    aa=(aa-pfit->az_cent)/pfit->az_std;
 	    if (tod->twogamma_saved) {
 	      mysin=sin7_pi(tod->twogamma_saved[det][j]);
 	      mycos=cos7_pi(tod->twogamma_saved[det][j]);
@@ -2718,6 +2721,7 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
 
 	    //get_twogamma_sincos(&mysin,&mycos,pfit->gamma_az_sin_coeffs[det],pfit->gamma_az_cos_coeffs[det],pfit->n_gamma_az_coeffs,tod->az[j],pfit->gamma_ctime_sin_coeffs[det],pfit->gamma_ctime_cos_coeffs[det],j*ninv);
 	    actData aa=az[j];
+	    aa=(aa-pfit->az_cent)/pfit->az_std;
 	    if (tod->twogamma_saved) {
 	      mysin=sin7_pi(tod->twogamma_saved[det][j]);
 	      mycos=cos7_pi(tod->twogamma_saved[det][j]);

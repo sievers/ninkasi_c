@@ -98,7 +98,10 @@ typedef struct {
   actData **sin2gamma_piv;
   actData **cos2gamma_piv;
 
+  
   int n_gamma_az_coeffs;
+  
+  actData az_cent,az_std;
   actData **gamma_az_cos_coeffs;
   actData *gamma_ctime_cos_coeffs;
   actData **gamma_az_sin_coeffs;
