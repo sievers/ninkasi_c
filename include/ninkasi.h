@@ -201,6 +201,7 @@ void run_PCG(MAPvec *maps, TODvec *tods, PARAMS *params);
 void allocate_tod_storage(mbTOD *tod);
 void tod2mapset(MAPvec *maps, mbTOD *tod, PARAMS *params);
 void assign_tod_value(mbTOD *tod, actData val);
+void assign_tod_value_uncut(mbTOD *tod, actData val);
 void free_tod_storage(mbTOD *tod);
 void destroy_tod(mbTOD *tod);
 
@@ -245,8 +246,9 @@ void get_tod_cut_regions(mbTOD *tod);
 mbUncut ***get_cut_regions_global_index(mbTOD *tod);
 int tod2cutvec(mbTOD *tod, actData *cutvec);
 int cutvec2tod(mbTOD *tod, actData *cutvec);
-
-
+int initialize_jumpvecs(mbTOD *tod, int *rows, int *cols, int *start, int *stop, int njump);
+int jumpvec2tod(mbTOD *tod, actData *jumpvec);
+int tod2jumpvec(mbTOD *tod, actData *jumpvec);
 
 void get_tod_uncut_regions(mbTOD *tod);
 void reverse_tod_uncut_regions(mbTOD *tod);

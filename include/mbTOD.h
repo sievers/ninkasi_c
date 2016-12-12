@@ -58,7 +58,14 @@ typedef struct {
   actData **offsetAzCosAlt; ///< Array of angular distance offsets in the Az direction (radians).
   actData *fit;             ///< Best fit parameters and errors for fitType fit.
 } mbPointingOffset;
-
+/*--------------------------------------------------------------------------------*/
+typedef struct {
+  int njump;
+  int *row;
+  int *col;
+  int *start;
+  int *stop;  
+} mbJumps;
 /*--------------------------------------------------------------------------------*/
 
 typedef struct {
@@ -222,6 +229,7 @@ typedef struct {
   
   mbUncut ***cuts_as_vec;  //!< vectorized cut regions for indexing into a global array
   mbUncut ***kept_data; //have a second copy of uncuts in case we wish to project/gapfill different data
+  mbJumps *jumps;  //keep track of flux jumps where we may wish to solve for offsets
   actData **ends;        //!< values at beginning and end of TOD for detrend/retrend
   int *detrended;      //!< is 0 if detector was not detrended and 1 if detrended
 

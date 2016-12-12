@@ -2555,10 +2555,16 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
 #pragma omp for
       for (int det=0;det<tod->ndet;det++) {
 
-	actData ctime_sin=pfit->gamma_ctime_sin_coeffs[det]*ninv;
-	actData ctime_cos=pfit->gamma_ctime_cos_coeffs[det]*ninv;
-	const actData *az_sin=pfit->gamma_az_sin_coeffs[det];
-	const actData *az_cos=pfit->gamma_az_cos_coeffs[det];
+	actData ctime_sin=0;
+	actData ctime_cos=0;
+	actData *az_sin=NULL;
+	actData *az_cos=NULL;
+	if (!tod->twogamma_saved) {
+	  ctime_sin=pfit->gamma_ctime_sin_coeffs[det]*ninv;
+	  ctime_cos=pfit->gamma_ctime_cos_coeffs[det]*ninv;
+	  az_sin=pfit->gamma_az_sin_coeffs[det];
+	  az_cos=pfit->gamma_az_cos_coeffs[det];
+	}
 
 	int row=tod->rows[det];
 	int col=tod->cols[det];
@@ -2567,13 +2573,13 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
 	  for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++){
 	    
 	    //get_twogamma_sincos(&mysin,&mycos,pfit->gamma_az_sin_coeffs[det],pfit->gamma_az_cos_coeffs[det],pfit->n_gamma_az_coeffs,tod->az[j],pfit->gamma_ctime_sin_coeffs[det],pfit->gamma_ctime_cos_coeffs[det],j*ninv);
-	    actData aa=az[j];
-	    aa=(aa-pfit->az_cent)/pfit->az_std;
 	    if (tod->twogamma_saved) {
 	      mysin=sin7_pi(tod->twogamma_saved[det][j]);
 	      mycos=cos7_pi(tod->twogamma_saved[det][j]);
 	    }
 	    else {
+	      actData aa=az[j];
+	      aa=(aa-pfit->az_cent)/pfit->az_std;
 	      mysin=az_sin[3]+aa*(az_sin[2]+aa*(az_sin[1]+aa*(az_sin[0])))+ctime_sin*j;
 	      mycos=az_cos[3]+aa*(az_cos[2]+aa*(az_cos[1]+aa*(az_cos[0])))+ctime_cos*j;
 	    }
@@ -2591,6 +2597,7 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
 	  }
 	}
       }
+
       break;
 
     case POL_QU:
@@ -2620,11 +2627,17 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
     case POL_IQU_PRECON:
 #pragma omp for
       for (int det=0;det<tod->ndet;det++) {
-	actData ctime_sin=pfit->gamma_ctime_sin_coeffs[det]*ninv;
-	actData ctime_cos=pfit->gamma_ctime_cos_coeffs[det]*ninv;
-	const actData *az_sin=pfit->gamma_az_sin_coeffs[det];
-	const actData *az_cos=pfit->gamma_az_cos_coeffs[det];
-
+	actData ctime_sin=0;
+	actData ctime_cos=0;
+	actData *az_sin=NULL;
+	actData *az_cos=NULL;
+	if (!tod->twogamma_saved) {
+	  ctime_sin=pfit->gamma_ctime_sin_coeffs[det]*ninv;
+	  ctime_cos=pfit->gamma_ctime_cos_coeffs[det]*ninv;
+	  az_sin=pfit->gamma_az_sin_coeffs[det];
+	  az_cos=pfit->gamma_az_cos_coeffs[det];
+	}
+	
 	int row=tod->rows[det];
 	int col=tod->cols[det];
 	mbUncut *uncut=tod->uncuts[row][col];
@@ -2632,13 +2645,13 @@ void tod2polmap_copy(MAP *map,mbTOD *tod)
 	  for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++){
 
 	    //get_twogamma_sincos(&mysin,&mycos,pfit->gamma_az_sin_coeffs[det],pfit->gamma_az_cos_coeffs[det],pfit->n_gamma_az_coeffs,tod->az[j],pfit->gamma_ctime_sin_coeffs[det],pfit->gamma_ctime_cos_coeffs[det],j*ninv);
-	    actData aa=az[j];
-	    aa=(aa-pfit->az_cent)/pfit->az_std;
 	    if (tod->twogamma_saved) {
 	      mysin=sin7_pi(tod->twogamma_saved[det][j]);
 	      mycos=cos7_pi(tod->twogamma_saved[det][j]);
 	    }
 	    else {
+	      actData aa=az[j];
+	      aa=(aa-pfit->az_cent)/pfit->az_std;	      
 	      mysin=az_sin[3]+aa*(az_sin[2]+aa*(az_sin[1]+aa*(az_sin[0])))+ctime_sin*j;
 	      mycos=az_cos[3]+aa*(az_cos[2]+aa*(az_cos[1]+aa*(az_cos[0])))+ctime_cos*j;
 	    }
@@ -2914,6 +2927,64 @@ void calculate_avec(mbTOD *tod, int mydet, actData *avec)
      //calculate the noise here.  Simplistically, using a single known 1/f filter for all data.
 {
   return;
+}
+
+/*--------------------------------------------------------------------------------*/
+int initialize_jumpvecs(mbTOD *tod, int *rows, int *cols, int *start, int *stop, int njump)
+{
+  mbJumps *jumps=(mbJumps *)malloc(sizeof(mbJumps));
+  jumps->njump=njump;
+  jumps->row=ivector(njump);
+  jumps->col=ivector(njump);
+  jumps->start=ivector(njump);
+  jumps->stop=ivector(njump);
+  for (int i=0;i<njump;i++) {
+    jumps->row[i]=rows[i];
+    jumps->col[i]=cols[i];
+    jumps->start[i]=start[i];
+    jumps->stop[i]=stop[i];
+  }
+  tod->jumps=jumps;
+  return 0;
+}
+/*--------------------------------------------------------------------------------*/
+int jumpvec2tod(mbTOD *tod, actData *jumpvec )
+{
+  if (!tod->have_data) {
+    fprintf(stderr,"missing data in tod in jumpvec2tod\n");
+    return 1;
+  }
+  if (tod->jumps==NULL) {
+    fprintf(stderr,"Error, tod does not contain jumps in jumpvec2tod.\n");
+    return 1;
+  }
+  mbJumps *jumps=tod->jumps;
+  for (int seg=0;seg<jumps->njump;seg++) {
+    int det=tod->dets[jumps->row[seg]][jumps->col[seg]];
+    for (int i=jumps->start[seg];i<jumps->stop[seg];i++)
+      tod->data[det][i]+=jumpvec[seg];
+  }
+  return 0;
+}
+
+/*--------------------------------------------------------------------------------*/
+int tod2jumpvec(mbTOD *tod, actData *jumpvec )
+{
+  if (!tod->have_data) {
+    fprintf(stderr,"missing data in tod in tod2jumpvec\n");
+    return 1;
+  }
+  if (tod->jumps==NULL) {
+    fprintf(stderr,"Error, tod does not contain jumps in tod2jumpvec\n");
+    return 1;
+  }
+  mbJumps *jumps=tod->jumps;
+  for (int seg=0;seg<jumps->njump;seg++) {
+    int det=tod->dets[jumps->row[seg]][jumps->col[seg]];
+    for (int i=jumps->start[seg];i<jumps->stop[seg];i++)
+      jumpvec[seg]+=tod->data[det][i];
+  }
+  return 0;
 }
 
 /*--------------------------------------------------------------------------------*/
@@ -3895,6 +3966,24 @@ void assign_tod_value(mbTOD *tod, actData val)
   for (int i=0;i<tod->ndet;i++)
     for (int j=0;j<tod->ndata;j++)
       tod->data[i][j]=val;
+}
+/*--------------------------------------------------------------------------------*/
+void assign_tod_value_uncut(mbTOD *tod, actData val)
+//fill tod with value only on uncut regions.  other segments are not touched.
+{
+  assert(tod->have_data);
+#pragma omp parallel for shared(tod,val) default(none) schedule(dynamic,1)
+  for (int i=0;i<tod->ndet;i++) {
+    if (!mbCutsIsAlwaysCut(tod->cuts,tod->rows[i],tod->cols[i])) {
+      int row=tod->rows[i];
+      int col=tod->cols[i];
+      mbUncut *uncut=tod->uncuts[row][col];
+      for (int region=0;region<uncut->nregions;region++)
+	for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++)
+	  tod->data[i][j]=val;
+    }
+    
+  }
 }
 /*--------------------------------------------------------------------------------*/
 int get_weights(MAPvec *maps, TODvec *tods, PARAMS *params)
