@@ -9,7 +9,8 @@ typedef enum {
   NK_CEA,
   NK_TAN,
   NK_HEALPIX_RING,
-  NK_HEALPIX_NEST
+  NK_HEALPIX_NEST,
+  NK_CAR
 
 } nkProjectionType;
 

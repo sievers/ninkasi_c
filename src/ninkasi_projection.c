@@ -46,6 +46,24 @@ static inline actData sin4(actData x)
 
 
 /*--------------------------------------------------------------------------------*/
+void radecvec2car_pix(const actData *ra, const actData *dec, int *rapix, int *decpix, int *ind, int ndata, const MAP *map)
+{
+  double rafac=RAD2DEG/map->projection->radelt;
+  double decfac=RAD2DEG/map->projection->decdelt;
+  actData dra=map->projection->rapix-1+0.5;
+  actData ddec=map->projection->decpix-1+0.5;
+  if ((rapix==NULL)&&(ind!=NULL)) {
+    //fill in the map with 1-d indices
+    for (int i=0;i<ndata;i++) {
+      int tmp_ra=ra[i]*rafac+dra;
+      int tmp_dec=dec[i]*decfac+ddec;
+      ind[i]=map->nx*tmp_dec+tmp_ra;
+    }
+    return;
+  }
+  
+  assert(1==0);  //should never get here.  
+}
 
 /*--------------------------------------------------------------------------------*/
 void radecvec2cea_pix(const actData *ra, const actData *dec, int *rapix, int *decpix, int *ind, int ndata, const MAP *map)
@@ -269,6 +287,16 @@ void radec2pix_cea(MAP *map, actData ra, actData dec, int *rapix, int *decpix)
 }
 
 /*--------------------------------------------------------------------------------*/
+void pix2radec_car(MAP *map, int rapix, int decpix, actData *ra, actData *dec)
+{
+  nkProjection *projection=map->projection;
+  double rafac=RAD2DEG/map->projection->radelt;
+  double decfac=RAD2DEG/map->projection->decdelt;
+  *ra=(rapix-projection->rapix+1)/rafac;
+  *dec=(decpix-projection->decpix+1)/decfac;
+  
+}
+/*--------------------------------------------------------------------------------*/
 void pix2radec_cea(MAP *map, int rapix, int decpix, actData *ra, actData *dec)
 {
   nkProjection *projection=map->projection;
@@ -297,6 +325,64 @@ void pix2radec_tan(MAP *map, int rapix, int decpix, actData *ra, actData *dec)
   *dec=asin(cos(cc)*sin(map->projection->dec_cent)+yy*sin(cc)*cos(map->projection->dec_cent)/rho);
   *ra=map->projection->ra_cent+atan(xx*sin(cc)/(rho*cos(map->projection->dec_cent)*cos(cc)-yy*sin(map->projection->dec_cent)*sin(cc)));
     
+}
+/*--------------------------------------------------------------------------------*/
+int set_map_projection_car_simple_predef(MAP *map,actData decdelt, actData radelt)
+{
+  map->projection->proj_type=NK_CAR;
+  map->projection->decdelt=decdelt;
+  map->projection->radelt= radelt;
+
+
+  actData ra0=map->ramax*RAD2DEG/map->projection->radelt;
+  actData ra1=map->ramin*RAD2DEG/map->projection->radelt+1;  //+1 is in in case of equality                                                                                                                
+  actData dec0=map->decmin*RAD2DEG/map->projection->decdelt;
+  actData dec1=map->decmax*RAD2DEG/map->projection->decdelt+1;  //+1 is in case of equality                                                                                       
+  map->projection->pv=1.0; // hardwired since only need to change ra/decdelt
+  map->projection->rapix=-(int)ra0;
+  map->projection->decpix=-(int)dec0;
+  map->nx=ra1-ra0;
+  map->ny=dec1-dec0;
+  free(map->map);
+  map->npix=map->nx*map->ny;
+  map->map=(actData *)malloc(sizeof(actData)*map->npix);
+
+  mprintf(stdout,"Offsets are %12.4f %12.4f\n",map->projection->rapix,map->projection->decpix);
+  mprintf(stdout,"Pixsizes are %14.8f %14.8f\n",map->projection->radelt,map->projection->decdelt);
+  mprintf(stdout,"ra/dec0/1 are %14.8f %14.8f %14.8f %14.8f\n",ra0,ra1,dec0,dec1);
+  mprintf(stdout,"pv is %14.6f\n",map->projection->pv);
+  mprintf(stdout,"map sizes are %d %d\n",map->nx, map->ny);
+  
+
+}
+/*--------------------------------------------------------------------------------*/
+
+int set_map_projection_car_simple(MAP *map)
+{
+  map->projection->proj_type=NK_CAR;
+  map->projection->decdelt=map->pixsize*RAD2DEG;
+  map->projection->radelt= -map->projection->decdelt;
+
+  actData ra0=map->ramax*RAD2DEG/map->projection->radelt;
+  actData ra1=map->ramin*RAD2DEG/map->projection->radelt+1;  //+1 is in in case of equality                                                                                                                
+  actData dec0=map->decmin*RAD2DEG/map->projection->decdelt;
+  actData dec1=map->decmax*RAD2DEG/map->projection->decdelt+1;  //+1 is in case of equality                                                                                       
+  map->projection->pv=1.0; // hardwired since only need to change ra/decdelt
+  map->projection->rapix=-(int)ra0;
+  map->projection->decpix=-(int)dec0;
+  map->nx=ra1-ra0;
+  map->ny=dec1-dec0;
+  free(map->map);
+  map->npix=map->nx*map->ny;
+  map->map=(actData *)malloc(sizeof(actData)*map->npix);
+
+  mprintf(stdout,"Offsets are %12.4f %12.4f\n",map->projection->rapix,map->projection->decpix);
+  mprintf(stdout,"Pixsizes are %14.8f %14.8f\n",map->projection->radelt,map->projection->decdelt);
+  mprintf(stdout,"ra/dec0/1 are %14.8f %14.8f %14.8f %14.8f\n",ra0,ra1,dec0,dec1);
+  mprintf(stdout,"pv is %14.6f\n",map->projection->pv);
+  mprintf(stdout,"map sizes are %d %d\n",map->nx, map->ny);
+  
+
 }
 /*--------------------------------------------------------------------------------*/
 
@@ -593,6 +679,45 @@ int set_map_projection_healpix_nest(MAP *map, int nside) {
 }
 #endif  //use_healpix
 /*--------------------------------------------------------------------------------*/
+int set_map_projection_car_predef( MAP *map,actData radelt, actData decdelt, actData rapix, actData decpix, int nra, int ndec)
+{
+  map->projection->proj_type=NK_CAR;
+  
+  map->projection->decdelt=decdelt;
+  map->projection->radelt=radelt;
+  map->projection->pv=1.0; //degenerate with radelt/decdelt in CAR
+  map->projection->rapix=rapix;
+  map->projection->decpix=decpix;
+  
+  map->nx=nra;
+  map->ny=ndec;
+  map->npix=nra*ndec;
+  
+  pix2radec_car(map,0,0,&(map->ramin),&(map->decmin));
+  pix2radec_car(map,map->nx-1,map->ny-1,&(map->ramax),&(map->decmax));
+  
+  if (map->ramin>map->ramax) {
+    actData tmp=map->ramin;
+    map->ramin=map->ramax;
+    map->ramax=tmp;
+  }
+  
+  if (map->decmin>map->decmax) {
+    actData tmp=map->decmin;
+    map->decmin=map->decmax;
+    map->decmax=tmp;
+  }
+  
+
+  free(map->map);
+  map->map=(actData *)malloc(sizeof(actData)*map->npix);
+
+  //printf("map limits are %14.5f %14.5f %14.5f %14.5f\n",map->ramin,map->ramax,map->decmin,map->decmax);
+
+  
+  return 0;
+}
+/*--------------------------------------------------------------------------------*/
 int set_map_projection_cea_predef( MAP *map,actData radelt, actData decdelt, actData rapix, actData decpix, actData pv, int nra, int ndec)
 {
   map->projection->proj_type=NK_CEA;
@@ -752,6 +877,9 @@ void convert_radec_to_map_pixel(const actData *ra, const actData *dec, int *ind,
 #endif
   case (NK_CEA):
     radecvec2cea_pix(ra,dec, NULL,NULL,ind,ndata,map);
+    break;
+  case (NK_CAR):
+    radecvec2car_pix(ra,dec, NULL,NULL,ind,ndata,map);
     break;
   default:
     printf("Unknown type in convert_radec_to_map_pixel.\n");

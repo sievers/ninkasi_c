@@ -4879,8 +4879,8 @@ void invert_pol_precon(MAP *map)
 	  mymat[0][0]=mm[ii];
 	  mymat[0][1]=mymat[1][0]=mm[ii+1];
 	  mymat[1][1]=mm[ii+2];
-	  //dinvsafe(mymat[0],2,1e-6);
-	  invert_posdef_mat(mymat,2);
+	  dinvsafe(mymat[0],2,1e-6);
+	  //invert_posdef_mat(mymat,2);
 	  mm[ii]=mymat[0][0];
 	  mm[ii+1]=mymat[0][1];
 	  mm[ii+2]=mymat[1][1];	  	  

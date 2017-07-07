@@ -36,6 +36,8 @@ typedef struct {
 void radecvec2cea_pix(const actData *ra, const actData *dec, int *rapix, int *decpix, int *ind, int ndata, const MAP *map);
 void get_map_projection(const mbTOD *tod, const MAP *map, int det, int *ind, PointingFitScratch *scratch);
 void get_map_projection_wchecks(const mbTOD *tod, const MAP *map, int det, int *ind, PointingFitScratch *scratch, bool *inbounds);
+int set_map_projection_car_simple( MAP *map);
+int set_map_projection_car_simple_predef(MAP *map,actData decdelt, actData radelt);
 int set_map_projection_cea_simple( MAP *map);
 int set_map_projection_cea_simple_predef( MAP *map,actData pixsize, actData pv);
 
@@ -44,6 +46,7 @@ int set_map_projection_cea_simple_keeppix( MAP *map);
 void radec2pix_cea(MAP *map, actData ra, actData dec, int *rapix, int *decpix);
 void pix2radec_cea(MAP *map, int rapix, int decpix, actData *ra, actData *dec);
 int set_map_projection_cea_predef( MAP *map,actData radelt, actData decdelt, actData rapix, actData decpix, actData pv, int nra, int ndec);
+int set_map_projection_car_predef( MAP *map,actData radelt, actData decdelt, actData rapix, actData decpix, int nra, int ndec);
 
 void pix2radec_tan(MAP *map, int rapix, int decpix, actData *ra, actData *dec);
 void set_map_projection_tan_predef(MAP *map, actData ra_cent, actData dec_cent, actData rapix, actData decpix, actData pixsize, int nra, int ndec);
