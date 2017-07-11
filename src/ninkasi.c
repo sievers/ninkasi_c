@@ -2245,6 +2245,7 @@ void polmap2tod_old(MAP *map, mbTOD *tod)
 
 void polmap2tod(MAP *map, mbTOD *tod)
 {
+
   assert(tod);
   assert(tod->data);
   assert(tod->pixelization_saved);
@@ -2310,10 +2311,25 @@ void polmap2tod(MAP *map, mbTOD *tod)
     case POL_IQU:
 #pragma omp for
       for (int det=0;det<tod->ndet;det++) {
+#if 0
 	actData ctime_sin=pfit->gamma_ctime_sin_coeffs[det]*ninv;
 	actData ctime_cos=pfit->gamma_ctime_cos_coeffs[det]*ninv;
 	const actData *az_sin=pfit->gamma_az_sin_coeffs[det];
 	const actData *az_cos=pfit->gamma_az_cos_coeffs[det];
+#else  //fix by JLS 11 July 2017 so if pfit isn't there, we don't seg fault.
+	actData ctime_sin=0;
+	actData ctime_cos=0;
+	actData *az_sin=NULL;
+        actData *az_cos=NULL;
+        if (!tod->twogamma_saved) {
+          ctime_sin=pfit->gamma_ctime_sin_coeffs[det]*ninv;
+          ctime_cos=pfit->gamma_ctime_cos_coeffs[det]*ninv;
+          az_sin=pfit->gamma_az_sin_coeffs[det];
+          az_cos=pfit->gamma_az_cos_coeffs[det];
+        }
+
+
+#endif
 
 	int row=tod->rows[det];
 	int col=tod->cols[det];
@@ -2322,13 +2338,15 @@ void polmap2tod(MAP *map, mbTOD *tod)
 	  for (int j=uncut->indexFirst[region];j<uncut->indexLast[region];j++){
 
 	    actData mysin,mycos;
-	    actData aa=az[j];
-	    aa=(aa-pfit->az_cent)/pfit->az_std;
+	    //actData aa=az[j];
+	    //aa=(aa-pfit->az_cent)/pfit->az_std;
 	    if (tod->twogamma_saved) {
 	      mysin=sin7_pi(tod->twogamma_saved[det][j]);
 	      mycos=cos7_pi(tod->twogamma_saved[det][j]);	      
 	    }
 	    else {
+	      actData aa=az[j];
+	      aa=(aa-pfit->az_cent)/pfit->az_std;
 	      mysin=az_sin[3]+aa*(az_sin[2]+aa*(az_sin[1]+aa*(az_sin[0])))+ctime_sin*j;
 	      mycos=az_cos[3]+aa*(az_cos[2]+aa*(az_cos[1]+aa*(az_cos[0])))+ctime_cos*j;
 	    }
@@ -2338,6 +2356,8 @@ void polmap2tod(MAP *map, mbTOD *tod)
 	    mysin=tmp;
 #endif
 	    int jj=tod->pixelization_saved[det][j]*npol;
+	    //if (j<10) 
+	    //printf("map pixels are %12.4g %12.4g %12.4g, and sin/cos are %10.6f %10.6f %10.6f\n",mymap[jj],mymap[jj+1],mymap[jj+2],mycos,mysin,tod->twogamma_saved[det][j]);
 	    tod->data[det][j]+=mymap[jj];
 	    tod->data[det][j]+=mymap[jj+1]*mycos;
 	    tod->data[det][j]+=mymap[jj+2]*mysin;
