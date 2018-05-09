@@ -44,9 +44,10 @@ CONFIG_CLEAN_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(bin_PROGRAMS)
-am_ninkasi_OBJECTS = astro.$(OBJEXT) clapack.$(OBJEXT) \
+#am_ninkasi_OBJECTS = astro.$(OBJEXT) clapack.$(OBJEXT) \
+am_ninkasi_OBJECTS =  clapack.$(OBJEXT) \
 	common_mode.$(OBJEXT) dirfile.$(OBJEXT) dirfile_io.$(OBJEXT) \
-	getdata.$(OBJEXT) iers_bulletin_a.$(OBJEXT) mbCuts.$(OBJEXT) \
+	getdata.$(OBJEXT)  mbCuts.$(OBJEXT) \
 	ninkasi.$(OBJEXT) ninkasi_noise.$(OBJEXT) \
 	ninkasi_tod.$(OBJEXT) parse_strings.$(OBJEXT) \
 	ps_stuff.$(OBJEXT)
@@ -156,7 +157,6 @@ ninkasi_SOURCES = astro.c \
 	dirfile.c \
 	dirfile_io.c \
 	getdata.c \
-	iers_bulletin_a.c \
 	mbCuts.c \
 	ninkasi.c \
 	ninkasi_noise.c \
@@ -242,7 +242,7 @@ include ./$(DEPDIR)/common_mode.Po
 include ./$(DEPDIR)/dirfile.Po
 include ./$(DEPDIR)/dirfile_io.Po
 include ./$(DEPDIR)/getdata.Po
-include ./$(DEPDIR)/iers_bulletin_a.Po
+#include ./$(DEPDIR)/iers_bulletin_a.Po
 include ./$(DEPDIR)/mbCuts.Po
 include ./$(DEPDIR)/ninkasi.Po
 include ./$(DEPDIR)/ninkasi_noise.Po

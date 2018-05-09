@@ -28,7 +28,8 @@
 
 #include "readtod.h"
 //#include "dirfile.h"
-#include "astro.h"
+//#include "astro.h"
+#include "actpol/astro.h"
 #include "mbCommon.h"
 #include "mbCuts.h"
 #include "mbTOD.h"

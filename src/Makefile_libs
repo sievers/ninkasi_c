@@ -7,7 +7,8 @@ INCLUDES= -I../include/ -I../  -I/cita/d/raid-sievers/sievers/util/fftw-3.2/incl
 
 CFLAGS= -fPIC -O3 -std=c99 ${INCLUDES}
 
-COBJ=dirfile.o getdata.o iers_bulletin_a.o  astro.o
+#COBJ=dirfile.o getdata.o iers_bulletin_a.o  astro.o
+COBJ=dirfile.o getdata.o iers_bulletin_a.o 
 LINK= -shared  -lc 
 VERSION= 1.0.1
 #gcc -shared -Wl,-soname,libmystuff.so.1 \

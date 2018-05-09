@@ -1,1 +1,1 @@
-Makefile.am.nrao2
+Makefile.am.gcc_niagara
